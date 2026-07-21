@@ -110,6 +110,7 @@ def base_record_from_graphql(card, job_ad: Optional[dict]) -> dict:
         "technical_skills": [],
         "software": [],
         "languages": [],
+        "structured_languages": [],  # langues requises brutes (source autoritaire)
         "salary": None,
         "benefits": [],
         "benefits_categorized": None,
@@ -166,6 +167,13 @@ def base_record_from_graphql(card, job_ad: Optional[dict]) -> dict:
             }
         )
     rec["languages"] = langs
+    # Copie brute conservée en base : elle sert de source autoritaire même après
+    # ré-analyse (l'agent d'extraction ne peut pas la dégrader).
+    rec["structured_languages"] = [
+        {"language": rl.get("language"), "level": rl.get("skill")}
+        for rl in (params.get("requiredLanguages") or [])
+        if rl.get("language")
+    ]
 
     rec["salary"] = normalize_salary(job_ad.get("salary"))
     rec["summary"] = job_ad.get("teaser") or ""

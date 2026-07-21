@@ -270,9 +270,10 @@ def process_offer(rec: dict) -> dict:
     original_text = rec.get("description_text") or ""
     working_title = rec.get("title") or ""
     working_text = original_text
-    # Langues requises structurées (jobs.cz) = source autoritaire, capturée avant
-    # que l'agent d'extraction ne (ré)écrive rec["languages"].
-    structured_langs = list(rec.get("languages") or [])
+    # Langues requises structurées (jobs.cz) = source autoritaire. On privilégie
+    # la copie brute `structured_languages` (survit à une ré-analyse) ; à défaut,
+    # rec["languages"] tel que posé par base_record avant l'agent.
+    structured_langs = list(rec.get("structured_languages") or rec.get("languages") or [])
 
     # 0) Traduction cz -> en (on garde les 2 versions).
     if source_lang.startswith("cs") and original_text:

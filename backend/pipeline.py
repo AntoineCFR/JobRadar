@@ -134,8 +134,14 @@ def reprocess_all(force: bool = True, progress: Optional[Callable] = None) -> di
         try:
             rec = dict(offer)
             rec["id"] = offer_id
-            # Détail manquant -> on retente de le récupérer.
-            if not (rec.get("description_text") or "").strip() and rec.get("link"):
+            # Re-récupération du détail si le texte manque OU si la copie brute des
+            # langues requises est absente (offres d'avant ce correctif) : ça rapatrie
+            # aussi la date de publication (widget v3) et le contenu à jour.
+            needs_refetch = rec.get("link") and (
+                not (rec.get("description_text") or "").strip()
+                or not rec.get("structured_languages")
+            )
+            if needs_refetch:
                 card = ListingCard(
                     site=rec.get("site", "jobs.cz"), id=offer_id,
                     title=rec.get("title", ""), company=rec.get("company", ""),

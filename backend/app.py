@@ -244,11 +244,25 @@ def admin_reprocess():
     try:
         from store import firestore_store
         from extraction.agents import process_offer
+        from extraction.schema import base_record_from_graphql
+        from scraper import jobs_cz
+        from scraper.jobs_cz import ListingCard
 
         offer = firestore_store.get_offer(offer_id)
         if not offer:
             return jsonify(error="offre introuvable"), 404
         offer["id"] = offer_id
+        # Re-récupération du détail (données structurées fraîches, dont langues + date).
+        if offer.get("link"):
+            card = ListingCard(
+                site=offer.get("site", "jobs.cz"), id=offer_id,
+                title=offer.get("title", ""), company=offer.get("company", ""),
+                location=offer.get("location_city", ""), link=offer["link"],
+            )
+            job_ad = jobs_cz.fetch_detail(card)
+            if job_ad:
+                offer = base_record_from_graphql(card, job_ad)
+                offer["id"] = offer_id
         offer = process_offer(offer)
         firestore_store.upsert_offer(offer)
         return jsonify(
