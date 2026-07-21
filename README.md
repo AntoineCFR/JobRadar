@@ -56,6 +56,9 @@ Render, générer les artefacts de build. → voir **« Ta liste de courses »**
    scrape, la bascule 🇨🇿/🇬🇧 sur une offre tchèque, la notif quotidienne.
 
 ## Notes de version
+### v0.5.1 (2026-07-21) — profil : PDF ou .md
+- Le profil accepte désormais **PDF (→ OCR Mistral)** ou **.md/.txt (→ ingestion directe**, plus léger/fiable). Détection par extension côté backend.
+
 ### v0.5.0 (2026-07-21) — bloc compétences fusionné + 2 actions distinctes
 - **Deux actions séparées** : « Scanner les nouvelles offres » (drawer → scrape + analyse des nouveautés) et « Ré-analyser toutes les offres » (page Profil → regénère l'analyse IA de toute la collection).
 - **Bloc unique « Compétences & technologies »** : logiciels et compétences techniques **fusionnés et regroupés par domaine**, avec une **icône** distinguant logiciel/techno vs compétence (+ légende).

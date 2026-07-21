@@ -48,12 +48,26 @@ def analyze_profile(text: str) -> Optional[dict]:
     return _ask_agent("profile", f"CANDIDATE DOCUMENT:\n{text}", max_chars=20000)
 
 
-def build_profile(pdf_bytes: bytes, filename: str = "profil.pdf") -> dict:
-    """OCR + structuration -> doc profil complet à stocker dans Firestore."""
-    text = ocr_pdf(pdf_bytes, filename)
+_TEXT_EXTS = (".md", ".markdown", ".txt")
+
+
+def build_profile(file_bytes: bytes, filename: str = "profil.pdf") -> dict:
+    """Structure un profil à partir d'un fichier.
+
+    - .md / .markdown / .txt -> ingestion directe du texte (pas d'OCR).
+    - autre (PDF...) -> Mistral OCR.
+    """
+    lower = (filename or "").lower()
+    if lower.endswith(_TEXT_EXTS):
+        text = file_bytes.decode("utf-8", errors="replace")
+        source = "text"
+    else:
+        text = ocr_pdf(file_bytes, filename)
+        source = "ocr"
     structured = analyze_profile(text) or {}
     return {
         "filename": filename,
+        "source": source,
         "text": text,
         "structured": structured,
         "version": profile_version(text),

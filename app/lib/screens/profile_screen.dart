@@ -28,7 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final res = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf'],
+      allowedExtensions: ['pdf', 'md', 'markdown', 'txt'],
       withData: true,
     );
     final file = res?.files.firstOrNull;
@@ -91,7 +91,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? const SizedBox(
                 width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
             : const Icon(Symbols.upload_file),
-        label: Text(_busy ? 'Analyse…' : 'Joindre un PDF'),
+        label: Text(_busy ? 'Analyse…' : 'Joindre (PDF ou .md)'),
       ),
       body: uid == null
           ? const Center(child: Text('Non connecté.'))
@@ -116,8 +116,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Text(
-              'Joins un PDF de tes compétences / ton CV. L\'IA l\'analysera pour '
-              'évaluer chaque offre selon ton profil (score, points bloquants, plan).',
+              'Joins un PDF ou un fichier .md de tes compétences / ton CV. L\'IA '
+              'l\'analysera pour évaluer chaque offre selon ton profil (score, '
+              'points bloquants, plan).',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
