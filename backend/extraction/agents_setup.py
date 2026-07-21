@@ -199,6 +199,40 @@ def _existing_by_name(client) -> dict:
     return found
 
 
+def rebuild_agents(client) -> dict:
+    """Supprime les agents JobRadar existants et les recrée avec les instructions
+    COURANTES (à appeler après avoir modifié un prompt). Déterministe : évite
+    l'ambiguïté de versioning de l'API `agents.update`."""
+    global _cache
+    try:
+        names = {spec["name"] for spec in _SPECS.values()}
+        page = client.beta.agents.list()
+        items = getattr(page, "data", None) or page or []
+        for a in items:
+            if getattr(a, "name", None) in names:
+                try:
+                    client.beta.agents.delete(agent_id=a.id)
+                    log.info("agent supprimé: %s", a.name)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("delete %s échoué: %s", a.id, e)
+    except Exception as e:  # noqa: BLE001
+        log.warning("list/delete agents échoué: %s", e)
+
+    ids = {}
+    for key, spec in _SPECS.items():
+        agent = client.beta.agents.create(
+            model=config.MISTRAL_MODEL,
+            name=spec["name"],
+            description=spec["name"],
+            instructions=spec["instructions"],
+        )
+        ids[key] = agent.id
+        log.info("agent (re)créé: %s -> %s", spec["name"], agent.id)
+    _cache = ids
+    _save_firestore(ids)
+    return ids
+
+
 def ensure_agents(client) -> dict:
     """Retourne {key: agent_id} pour tous les agents, en créant ce qui manque."""
     global _cache

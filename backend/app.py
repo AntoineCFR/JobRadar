@@ -200,12 +200,14 @@ def setup_agents():
     """
     if not _authorized(request):
         return jsonify(error="unauthorized"), 401
+    rebuild = bool((request.get_json(silent=True) or {}).get("rebuild"))
     try:
         from extraction.agents import _get_client
-        from extraction.agents_setup import ensure_agents
+        from extraction.agents_setup import ensure_agents, rebuild_agents
 
-        ids = ensure_agents(_get_client())
-        return jsonify(status="ok", agents=ids)
+        client = _get_client()
+        ids = rebuild_agents(client) if rebuild else ensure_agents(client)
+        return jsonify(status="ok", rebuilt=rebuild, agents=ids)
     except Exception as e:  # noqa: BLE001
         log.exception("setup-agents failed")
         return jsonify(error=str(e)), 500
