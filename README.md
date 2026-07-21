@@ -56,6 +56,12 @@ Render, générer les artefacts de build. → voir **« Ta liste de courses »**
    scrape, la bascule 🇨🇿/🇬🇧 sur une offre tchèque, la notif quotidienne.
 
 ## Notes de version
+### v0.2.0 (2026-07-21) — déploiement + agents dédiés + login email
+- **Déployé en prod** : API sur Render (`https://jobradar-tlqj.onrender.com`), Firebase `jobradar-3610d` (Firestore + règles), 1er scrape validé (30 offres, 0 erreur).
+- **Agents Mistral dédiés** (`JobRadar · Extraction offre`, `JobRadar · Traduction CZ→EN`) créés via l'API et mis en cache Firestore ; repli automatique sur `chat.complete` si la clé n'a pas l'API Agents.
+- **Connexion email/mot de passe** (+ création de compte) en plus de Google — utile pour tester sur émulateur.
+- Recherches du cron déplacées dans Firestore (`searches`) ; config Firebase retirée du suivi git.
+
 ### v0.1.0 (2026-07-20) — fondations
 - Backend Flask complet : scraper Jobs.cz (liste HTML + détail GraphQL + fallback
   HTML), agents Mistral (extraction + traduction cz→en), store Firestore, push FCM,
