@@ -44,11 +44,10 @@ class ScrapeService {
     }
   }
 
-  /// Boucle complète : re-scrape les recherches surveillées + extraction + matching.
-  Future<bool> triggerFullRun() async {
+  Future<bool> _post(String path) async {
     try {
       final resp = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/run-searches'),
+        Uri.parse('${AppConfig.apiBaseUrl}$path'),
         headers: {
           'Content-Type': 'application/json',
           if (AppConfig.apiKey.isNotEmpty) 'X-JobRadar-Key': AppConfig.apiKey,
@@ -60,6 +59,13 @@ class ScrapeService {
       return false;
     }
   }
+
+  /// Scanne les nouvelles offres : re-scrape les recherches surveillées, seules
+  /// les offres inconnues sont analysées (+ matching).
+  Future<bool> scanNewOffers() => _post('/run-searches');
+
+  /// Ré-analyse TOUTE la collection : regénère l'analyse IA de chaque offre.
+  Future<bool> reanalyzeAll() => _post('/admin/reprocess-all');
 
   /// Déclenche le (re)matching des offres en attente côté backend.
   Future<bool> triggerMatch() async {

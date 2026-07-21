@@ -6,6 +6,7 @@ import '../models/offer.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/explained_list.dart';
 import '../widgets/match_card.dart';
+import '../widgets/skill_block.dart';
 import 'offer_description_screen.dart';
 
 /// Fiche offre : en-tête → (matching) → résumé → langues → logiciels →
@@ -100,13 +101,9 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           // 4) Langues
           if (o.languages.isNotEmpty) _languages(context),
 
-          // 5) Logiciels et technos (groupés par domaine)
-          if (o.software.isNotEmpty)
-            _skillSection(context, Symbols.terminal, 'Logiciels & technos', o.software),
-
-          // 6) Compétences techniques (groupées par domaine)
-          if (o.technicalSkills.isNotEmpty)
-            _skillSection(context, Symbols.construction, 'Compétences techniques', o.technicalSkills),
+          // 5) Compétences & technologies (logiciels + compétences fusionnés, par domaine)
+          if (o.software.isNotEmpty || o.technicalSkills.isNotEmpty)
+            SkillBlock(software: o.software, technical: o.technicalSkills),
 
           // 7) Compétences humaines
           if (o.softSkills.isNotEmpty) ...[
@@ -178,27 +175,6 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           ]),
       ],
     );
-  }
-
-  Widget _skillSection(BuildContext context, IconData icon, String title, List<SkillItem> items) {
-    final groups = <String, List<SkillItem>>{};
-    for (final it in items) {
-      (groups[it.domain] ??= []).add(it);
-    }
-    final scheme = Theme.of(context).colorScheme;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _sectionTitle(context, icon, title),
-      for (final entry in groups.entries) ...[
-        if (entry.key.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 2, bottom: 8),
-            child: Text(entry.key.toUpperCase(),
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.primary, fontWeight: FontWeight.w700, letterSpacing: 0.6)),
-          ),
-        ExplainedList(items: entry.value),
-      ],
-    ]);
   }
 
   Widget _languages(BuildContext context) {

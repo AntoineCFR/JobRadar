@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/profile.dart';
 import '../services/auth_service.dart';
 import '../services/profile_service.dart';
+import '../services/scrape_service.dart';
 import '../widgets/app_scaffold.dart';
 
 /// Écran « Mon profil » : joindre un PDF de compétences → analysé par l'IA,
@@ -47,11 +48,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ));
   }
 
+  Future<void> _reanalyzeAll() async {
+    final scrape = context.read<ScrapeService>();
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Ré-analyser toutes les offres ?'),
+        content: const Text(
+            'Chaque offre de la collection sera repassée dans les agents IA '
+            '(extraction + matching). Cela peut prendre plusieurs minutes.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Lancer')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final started = await scrape.reanalyzeAll();
+    messenger.showSnackBar(SnackBar(
+      content: Text(started
+          ? 'Ré-analyse lancée en arrière-plan. Les offres se mettront à jour au fil de l\'eau.'
+          : 'Impossible de lancer la ré-analyse (une autre est peut-être en cours).'),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final uid = context.read<AuthService>().currentUser?.uid;
     return AppScaffold(
       title: 'Mon profil',
+      actions: [
+        IconButton(
+          tooltip: 'Ré-analyser toutes les offres',
+          icon: const Icon(Symbols.autorenew),
+          onPressed: _reanalyzeAll,
+        ),
+      ],
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _busy ? null : _pickAndUpload,
         icon: _busy

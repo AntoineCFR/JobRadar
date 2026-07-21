@@ -38,14 +38,13 @@ class _OffersScreenState extends State<OffersScreen> {
     messenger.showSnackBar(SnackBar(content: Text(result.message)));
   }
 
-  Future<void> _refreshAll() async {
-    final ok = await context.read<ScrapeService>().triggerFullRun();
+  Future<void> _scanNew() async {
+    final ok = await context.read<ScrapeService>().scanNewOffers();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(ok
-          ? 'Actualisation lancée : récupération + analyse + matching en arrière-plan. '
-              'Les offres apparaîtront au fil de l\'eau.'
-          : 'Impossible de lancer l\'actualisation (serveur injoignable ?).'),
+          ? 'Scan lancé : les nouvelles offres sont récupérées et analysées en arrière-plan.'
+          : 'Impossible de lancer le scan (serveur injoignable ?).'),
     ));
   }
 
@@ -84,7 +83,7 @@ class _OffersScreenState extends State<OffersScreen> {
             onNewSearch: _launchSearch,
             onMarkAllRead: () => offersService.markAllRead(all),
             onOpenProfile: _openProfile,
-            onRefreshAll: _refreshAll,
+            onScanNew: _scanNew,
             unreadOnly: _unreadOnly,
             onUnreadOnlyChanged: (v) => setState(() => _unreadOnly = v),
             sortByRelevance: _sortByRelevance,
