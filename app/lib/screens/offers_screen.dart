@@ -6,6 +6,7 @@ import '../models/offer.dart';
 import '../services/offers_service.dart';
 import '../services/scrape_service.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/backend_activity_bar.dart';
 import '../widgets/offer_tile.dart';
 import '../widgets/options_drawer.dart';
 import '../widgets/scrape_dialog.dart';
@@ -101,15 +102,21 @@ class _OffersScreenState extends State<OffersScreen> {
             icon: const Icon(Symbols.travel_explore),
             label: const Text('Rechercher'),
           ),
-          footer: Row(
+          footer: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Symbols.radar, size: 16),
-              const SizedBox(width: 6),
-              Text('${all.length} offres · $unread nouvelles'),
-              const Spacer(),
-              if (snapshot.connectionState == ConnectionState.waiting)
-                const SizedBox(
-                    width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+              Row(
+                children: [
+                  const Icon(Symbols.radar, size: 16),
+                  const SizedBox(width: 6),
+                  Text('${all.length} offres · $unread nouvelles'),
+                  const Spacer(),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const SizedBox(
+                        width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                ],
+              ),
+              const BackendActivityBar(label: 'Récupération / analyse des offres en cours…'),
             ],
           ),
           body: Column(

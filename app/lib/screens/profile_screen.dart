@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/profile_service.dart';
 import '../services/scrape_service.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/backend_activity_bar.dart';
 
 /// Écran « Mon profil » : joindre un PDF de compétences → analysé par l'IA,
 /// puis utilisé pour matcher les offres.
@@ -85,6 +86,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onPressed: _reanalyzeAll,
         ),
       ],
+      footer: const BackendActivityBar(label: 'Analyse / matching des offres en cours…'),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _busy ? null : _pickAndUpload,
         icon: _busy

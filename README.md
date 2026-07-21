@@ -56,6 +56,9 @@ Render, générer les artefacts de build. → voir **« Ta liste de courses »**
    scrape, la bascule 🇨🇿/🇬🇧 sur une offre tchèque, la notif quotidienne.
 
 ## Notes de version
+### v0.5.2 (2026-07-21) — barre de progression d'activité
+- **Barre de progression en bas** des pages Offres et Profil quand un traitement tourne côté serveur (scrape / extraction / matching). Interroge `/status` en boucle, ne s'affiche que pendant un run.
+
 ### v0.5.1 (2026-07-21) — profil : PDF ou .md
 - Le profil accepte désormais **PDF (→ OCR Mistral)** ou **.md/.txt (→ ingestion directe**, plus léger/fiable). Détection par extension côté backend.
 
