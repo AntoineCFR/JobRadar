@@ -56,6 +56,12 @@ Render, générer les artefacts de build. → voir **« Ta liste de courses »**
    scrape, la bascule 🇨🇿/🇬🇧 sur une offre tchèque, la notif quotidienne.
 
 ## Notes de version
+### v0.7.2 (2026-07-21) — matching recalibré + échelle de niveau à 4 crans
+- **Matching réaliste** : barème étalé (reconversion sans XP domaine → 30-55% ; tchèque fluent exigé → quasi rédhibitoire ~10-20% ; transférable/équivalences créditées sans exploser le score). Calibrateur rééquilibré dans les deux sens.
+- **Langues requises structurées = autoritaires** (l'agent ne peut plus dégrader un tchèque exigé) + stockées brutes (survivent au reprocess) ; niveaux tchèques normalisés (Výborná → Excellent C1-C2).
+- **Échelle de niveau (barres)** : Notion (1) · Déjà pratiqué (2) · Pratique habituelle (3) · Maîtrise (4, ~6-12 mois pro quotidien). Notation profil conservatrice.
+- `EXTRACTION_VERSION=4`, `MATCH_VERSION=3` (la ré-analyse re-fait tout).
+
 ### v0.7.1 (2026-07-21) — date d'offre : fallback détection
 - La date de publication ne vient que du GraphQL `validFrom` ; ~38% des offres sont hébergées sur www.jobs.cz **sans date exposée**. Le fix widget-v3 restaure la date des offres employeurs (après ré-analyse).
 - La tuile affiche désormais **« Publiée le X »** si connue, sinon **« Vue le X »** (date de détection). Le tri par date et le flag « NEW » se basent de toute façon sur la détection (`first_seen_at`), donc les nouveautés restent fiables.
