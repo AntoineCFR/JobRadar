@@ -109,9 +109,15 @@ def _ask_agent(agent_key: str, user_text: str, max_chars: int = 14000) -> Option
 # Helpers de normalisation
 # --------------------------------------------------------------------------- #
 def _cap(s: str) -> str:
-    """Majuscule initiale, sans toucher au reste (préserve SQL, Power BI…)."""
+    """Majuscule initiale. Dé-majuscule un libellé entièrement en CAPITALES
+    (« PRIME ANNUELLE » -> « Prime annuelle ») tout en préservant les acronymes
+    et casses mixtes (SQL, MS Azure, Power BI)."""
     s = (s or "").strip()
-    return s[:1].upper() + s[1:] if s else s
+    if not s:
+        return s
+    if s.isupper() and len(s) > 3:  # libellé tout en majuscules -> phrase
+        s = s.capitalize()
+    return s[:1].upper() + s[1:]
 
 
 def _int_0_100(v) -> Optional[int]:

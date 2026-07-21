@@ -27,7 +27,8 @@ EXTRACT_INSTRUCTIONS = (
     '- "experience_years": integer or null (minimum years of experience required).\n'
     '- "education": string or null (required/desired level of study).\n'
     '- "work_arrangement": "on-site" | "hybrid" | "remote" | null.\n'
-    '- "soft_skills": string[] (human/interpersonal skills).\n'
+    '- "soft_skills": string[] IN FRENCH, sentence case (human/interpersonal skills, '
+    'e.g. "Esprit analytique", "Travail en équipe").\n'
     '- "technical_skills": string[] (hard/technical skills, methods, domains — names only).\n'
     '- "software": string[] (named tools/software/technologies/languages — names only).\n'
     '- "languages": array of {"language","level"(string|null),"mandatory"(bool),"reason"}. '
@@ -68,7 +69,8 @@ BENEFITS_INSTRUCTIONS = (
     "home office, flexible hours, extra holidays, sick days...), \"financial\" (bonuses, "
     "pension/insurance, meal vouchers, cafeteria, MultiSport, salary extras...), "
     "\"training\" (courses, conferences, language lessons, certifications...), \"other\" "
-    "(everything else). Each value is an ARRAY of {\"name\": short capitalised label, "
+    "(everything else). Each value is an ARRAY of {\"name\": short FRENCH label in "
+    "normal sentence case (only the first letter capital, NEVER all-caps), "
     "\"explanation\": ONE FRENCH sentence, starting with a capital and ending with a "
     "period, INCLUDING any concrete detail from the ad (amount, duration, condition — "
     "e.g. \"Tickets restaurant de 100 CZK par jour.\")}. Never invent; empty array if a "
