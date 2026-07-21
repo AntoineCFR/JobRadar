@@ -10,6 +10,7 @@ import '../widgets/offer_tile.dart';
 import '../widgets/options_drawer.dart';
 import '../widgets/scrape_dialog.dart';
 import 'offer_detail_screen.dart';
+import 'profile_screen.dart';
 
 /// Écran principal : liste des offres (tuiles) + lancement de recherche.
 class OffersScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class OffersScreen extends StatefulWidget {
 
 class _OffersScreenState extends State<OffersScreen> {
   bool _unreadOnly = false;
+  bool _sortByRelevance = false;
   String _query = '';
 
   Future<void> _launchSearch() async {
@@ -36,16 +38,33 @@ class _OffersScreenState extends State<OffersScreen> {
     messenger.showSnackBar(SnackBar(content: Text(result.message)));
   }
 
-  List<Offer> _filter(List<Offer> offers) {
-    return offers.where((o) {
+  Future<void> _rematch() async {
+    final ok = await context.read<ScrapeService>().triggerMatch();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok
+          ? 'Analyse des offres lancée en arrière-plan.'
+          : 'Impossible de lancer l\'analyse (profil manquant ?).'),
+    ));
+  }
+
+  void _openProfile() =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+
+  List<Offer> _prepare(List<Offer> offers) {
+    var list = offers.where((o) {
       if (_unreadOnly && o.isRead) return false;
       if (_query.isEmpty) return true;
       final q = _query.toLowerCase();
       return o.title.toLowerCase().contains(q) ||
           o.company.toLowerCase().contains(q) ||
-          o.software.any((s) => s.toLowerCase().contains(q)) ||
-          o.technicalSkills.any((s) => s.toLowerCase().contains(q));
+          o.software.any((s) => s.name.toLowerCase().contains(q)) ||
+          o.technicalSkills.any((s) => s.name.toLowerCase().contains(q));
     }).toList();
+    if (_sortByRelevance) {
+      list.sort((a, b) => (b.match?.score ?? -1).compareTo(a.match?.score ?? -1));
+    }
+    return list;
   }
 
   @override
@@ -55,7 +74,7 @@ class _OffersScreenState extends State<OffersScreen> {
       stream: offersService.watchOffers(),
       builder: (context, snapshot) {
         final all = snapshot.data ?? [];
-        final offers = _filter(all);
+        final offers = _prepare(all);
         final unread = all.where((o) => !o.isRead).length;
 
         return AppScaffold(
@@ -63,14 +82,18 @@ class _OffersScreenState extends State<OffersScreen> {
           drawer: OptionsDrawer(
             onNewSearch: _launchSearch,
             onMarkAllRead: () => offersService.markAllRead(all),
+            onOpenProfile: _openProfile,
+            onRematch: _rematch,
             unreadOnly: _unreadOnly,
             onUnreadOnlyChanged: (v) => setState(() => _unreadOnly = v),
+            sortByRelevance: _sortByRelevance,
+            onSortChanged: (v) => setState(() => _sortByRelevance = v),
           ),
           actions: [
             IconButton(
-              tooltip: 'Filtrer',
-              icon: Icon(_unreadOnly ? Symbols.filter_alt : Symbols.filter_alt_off),
-              onPressed: () => setState(() => _unreadOnly = !_unreadOnly),
+              tooltip: 'Trier par pertinence',
+              icon: Icon(_sortByRelevance ? Symbols.sort : Symbols.schedule),
+              onPressed: () => setState(() => _sortByRelevance = !_sortByRelevance),
             ),
           ],
           floatingActionButton: FloatingActionButton.extended(

@@ -6,6 +6,7 @@ import 'app.dart';
 import 'services/auth_service.dart';
 import 'services/messaging_service.dart';
 import 'services/offers_service.dart';
+import 'services/profile_service.dart';
 import 'services/scrape_service.dart';
 
 Future<void> main() async {
@@ -23,6 +24,7 @@ Future<void> main() async {
         Provider(create: (_) => AuthService()),
         Provider(create: (_) => OffersService()),
         Provider(create: (_) => ScrapeService()),
+        Provider(create: (_) => ProfileService()),
       ],
       child: const JobRadarApp(),
     ),

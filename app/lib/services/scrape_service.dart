@@ -44,6 +44,23 @@ class ScrapeService {
     }
   }
 
+  /// Déclenche le (re)matching des offres en attente côté backend.
+  Future<bool> triggerMatch() async {
+    try {
+      final resp = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/match'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (AppConfig.apiKey.isNotEmpty) 'X-JobRadar-Key': AppConfig.apiKey,
+        },
+        body: '{}',
+      ).timeout(const Duration(seconds: 20));
+      return resp.statusCode == 202;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<Map<String, dynamic>?> status() async {
     try {
       final resp = await http

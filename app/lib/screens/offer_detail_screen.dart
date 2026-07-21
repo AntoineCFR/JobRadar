@@ -4,9 +4,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/offer.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/explained_list.dart';
+import '../widgets/match_card.dart';
+import 'offer_description_screen.dart';
 
-/// Fiche offre : mise en page soignée, icônes Material Symbols, bascule 🇨🇿/🇬🇧
-/// quand une traduction existe.
+/// Fiche offre : en-tête → (matching) → résumé → langues → logiciels →
+/// compétences techniques → humaines → avantages. Bascule 🇨🇿/🇬🇧.
 class OfferDetailScreen extends StatefulWidget {
   final Offer offer;
   const OfferDetailScreen({super.key, required this.offer});
@@ -16,16 +19,10 @@ class OfferDetailScreen extends StatefulWidget {
 }
 
 class _OfferDetailScreenState extends State<OfferDetailScreen> {
-  late bool _showEnglish = widget.offer.isCzech; // par défaut, la version EN pour une offre CZ
-
+  late bool _showEnglish = widget.offer.isCzech;
   Offer get o => widget.offer;
 
-  String get _title =>
-      (_showEnglish && o.hasTranslation) ? o.translated!.title : o.title;
-  String get _summary =>
-      (_showEnglish && o.hasTranslation) ? o.translated!.summary : o.summary;
-  String get _description =>
-      (_showEnglish && o.hasTranslation) ? o.translated!.descriptionText : o.descriptionText;
+  String get _summary => (_showEnglish && o.hasTranslation) ? o.translated!.summary : o.summary;
 
   Future<void> _apply() async {
     final uri = Uri.tryParse(o.applyUrl);
@@ -34,6 +31,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final benefits = o.benefits;
     return AppScaffold(
       title: 'Fiche offre',
       actions: [
@@ -59,41 +57,97 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
-          Text(_title, style: Theme.of(context).textTheme.headlineSmall),
+          // 1) En-tête
+          Text(o.displayTitle, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 8),
           _line(Symbols.apartment, o.company),
-          if (o.intermediary.isNotEmpty)
-            _line(Symbols.handshake, 'Recruté via ${o.intermediary}'),
+          if (o.intermediary.isNotEmpty) _line(Symbols.handshake, 'Recruté via ${o.intermediary}'),
           if (o.locationLabel.isNotEmpty) _line(Symbols.location_on, o.locationLabel),
           if (o.publishedAt != null) _line(Symbols.event, _fmtDate(o.publishedAt!)),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          _metaTable(context),
 
-          _metaGrid(context),
+          // 2) Matching (si calculé)
+          if (o.match != null) ...[
+            const SizedBox(height: 16),
+            MatchCard(match: o.match!),
+          ],
 
+          // 3) Résumé + accès offre complète
           if (_summary.isNotEmpty) ...[
             _sectionTitle(context, Symbols.summarize, 'Résumé'),
             Text(_summary, style: const TextStyle(height: 1.4)),
           ],
+          if (o.descriptionText.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.tonalIcon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          OfferDescriptionScreen(offer: o, english: _showEnglish),
+                    ),
+                  ),
+                  icon: const Icon(Symbols.article),
+                  label: const Text("Accéder à l'offre complète"),
+                ),
+              ),
+            ),
 
-          _chipSection(context, Symbols.psychology, 'Compétences humaines', o.softSkills),
-          _chipSection(context, Symbols.construction, 'Compétences techniques', o.technicalSkills),
-          _chipSection(context, Symbols.terminal, 'Logiciels & technos', o.software),
-
+          // 4) Langues
           if (o.languages.isNotEmpty) _languages(context),
 
-          _chipSection(context, Symbols.card_giftcard, 'Avantages', o.benefits),
+          // 5) Logiciels et technos
+          if (o.software.isNotEmpty) ...[
+            _sectionTitle(context, Symbols.terminal, 'Logiciels & technos'),
+            ExplainedList(items: o.software),
+          ],
 
-          if (_description.isNotEmpty) ...[
-            _sectionTitle(context, Symbols.description, 'Description complète'),
-            Text(_description, style: const TextStyle(height: 1.4)),
+          // 6) Compétences techniques
+          if (o.technicalSkills.isNotEmpty) ...[
+            _sectionTitle(context, Symbols.construction, 'Compétences techniques'),
+            ExplainedList(items: o.technicalSkills),
+          ],
+
+          // 7) Compétences humaines
+          if (o.softSkills.isNotEmpty) ...[
+            _sectionTitle(context, Symbols.psychology, 'Compétences humaines'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: o.softSkills
+                  .map((s) => Chip(label: Text(s), visualDensity: VisualDensity.compact))
+                  .toList(),
+            ),
+          ],
+
+          // 8) Avantages (4 catégories)
+          if (benefits != null && !benefits.isEmpty) ...[
+            _sectionTitle(context, Symbols.card_giftcard, 'Avantages'),
+            _benefitGroup(context, 'Flexibilité du travail', benefits.flexibility, Symbols.schedule),
+            _benefitGroup(context, 'Contributions financières', benefits.financial, Symbols.payments),
+            _benefitGroup(context, 'Formations', benefits.training, Symbols.school),
+            _benefitGroup(context, 'Autres', benefits.other, Symbols.more_horiz),
+          ] else if (o.benefitsFlat.isNotEmpty) ...[
+            _sectionTitle(context, Symbols.card_giftcard, 'Avantages'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: o.benefitsFlat
+                  .map((b) => Chip(label: Text(b), visualDensity: VisualDensity.compact))
+                  .toList(),
+            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _metaGrid(BuildContext context) {
-    final items = <List<dynamic>>[
+  Widget _metaTable(BuildContext context) {
+    final rows = <List<dynamic>>[
       if (o.salaryLabel != null) [Symbols.payments, 'Salaire', o.salaryLabel!],
       if (o.workArrangement.isNotEmpty) [Symbols.home_work, 'Mode', o.workArrangement],
       if (o.experienceYears != null) [Symbols.trending_up, 'Expérience', '${o.experienceYears}+ ans'],
@@ -101,103 +155,107 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
       if (o.contractType.isNotEmpty) [Symbols.assignment, 'Contrat', o.contractType],
       if (o.sector.isNotEmpty) [Symbols.category, 'Secteur', o.sector],
     ];
-    if (items.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        children: items
-            .map((it) => _metaRow(context, it[0] as IconData, it[1] as String, it[2] as String))
-            .toList(),
-      ),
-    );
-  }
-
-  Widget _metaRow(BuildContext context, IconData icon, String label, String value) {
+    if (rows.isEmpty) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icon, size: 18, color: scheme.primary),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 90,
-          child: Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(color: scheme.onSurfaceVariant)),
-        ),
-        Expanded(child: Text(value, style: Theme.of(context).textTheme.bodyMedium)),
-      ]),
+    return Table(
+      columnWidths: const {0: IntrinsicColumnWidth(), 1: FlexColumnWidth()},
+      defaultVerticalAlignment: TableCellVerticalAlignment.top,
+      children: [
+        for (final r in rows)
+          TableRow(children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16, bottom: 8),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(r[0] as IconData, size: 18, color: scheme.primary),
+                const SizedBox(width: 8),
+                Text(r[1] as String,
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelMedium
+                        ?.copyWith(color: scheme.onSurfaceVariant)),
+              ]),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(r[2] as String, style: Theme.of(context).textTheme.bodyMedium),
+            ),
+          ]),
+      ],
     );
   }
 
   Widget _languages(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _sectionTitle(context, Symbols.translate, 'Langues'),
-      ...o.languages.map((l) {
-        final scheme = Theme.of(context).colorScheme;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(l.mandatory ? Symbols.priority_high : Symbols.chevron_right,
-                size: 18, color: l.mandatory ? scheme.error : scheme.onSurfaceVariant),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(
-                  '${l.language}${l.level != null && l.level!.isNotEmpty ? ' — ${l.level}' : ''}'
-                  '${l.mandatory ? '  (impérative)' : ''}',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                if (l.reason.isNotEmpty)
-                  Text(l.reason,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant)),
-              ]),
-            ),
-          ]),
-        );
-      }),
+      ...o.languages.map((l) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2, right: 8),
+                child: Icon(l.mandatory ? Symbols.priority_high : Symbols.chevron_right,
+                    size: 18, color: l.mandatory ? scheme.error : scheme.primary),
+              ),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(
+                    '${l.language}${l.level != null && l.level!.isNotEmpty ? ' — ${l.level}' : ''}'
+                    '${l.mandatory ? '  (impérative)' : ''}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  if (l.reason.isNotEmpty)
+                    Text(l.reason,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant, height: 1.3)),
+                ]),
+              ),
+            ]),
+          )),
     ]);
   }
 
-  Widget _chipSection(BuildContext context, IconData icon, String title, List<String> items) {
+  Widget _benefitGroup(BuildContext context, String title, List<SkillItem> items, IconData icon) {
     if (items.isEmpty) return const SizedBox.shrink();
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _sectionTitle(context, icon, title),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: items.map((e) => Chip(label: Text(e), visualDensity: VisualDensity.compact)).toList(),
-      ),
-    ]);
-  }
-
-  Widget _sectionTitle(BuildContext context, IconData icon, String title) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 10),
-      child: Row(children: [
-        Icon(icon, size: 20, color: scheme.primary),
-        const SizedBox(width: 8),
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(children: [
+            Icon(icon, size: 16, color: scheme.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text(title,
+                style: Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(color: scheme.onSurfaceVariant)),
+          ]),
+        ),
+        ExplainedList(items: items, bullet: Symbols.check_small),
       ]),
     );
   }
 
-  Widget _line(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(children: [
-        Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text)),
-      ]),
-    );
-  }
+  Widget _sectionTitle(BuildContext context, IconData icon, String title) => Padding(
+        padding: const EdgeInsets.only(top: 20, bottom: 10),
+        child: Row(children: [
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+        ]),
+      );
+
+  Widget _line(IconData icon, String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(children: [
+          Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ]),
+      );
 
   String _fmtDate(String iso) {
     final dt = DateTime.tryParse(iso);

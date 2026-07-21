@@ -1,7 +1,7 @@
 name: jobradar
 description: "JobRadar — portail de veille d'offres d'emploi (Jobs.cz)."
 publish_to: 'none'
-version: 0.2.0+2
+version: 0.3.0+3
 
 environment:
   sdk: ^3.9.0
@@ -30,6 +30,7 @@ dependencies:
   intl: ^0.20.2
   url_launcher: ^6.3.1
   shared_preferences: ^2.5.5
+  file_picker: ^8.1.7
 
 dev_dependencies:
   flutter_test:

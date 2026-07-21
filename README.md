@@ -56,6 +56,12 @@ Render, générer les artefacts de build. → voir **« Ta liste de courses »**
    scrape, la bascule 🇨🇿/🇬🇧 sur une offre tchèque, la notif quotidienne.
 
 ## Notes de version
+### v0.3.0 (2026-07-21) — multi-agents (extraction + conseil) & refonte fiche
+- **Extraction multi-agents** : `extract → data_expert (ordre par niveau + regroupement logique + explication par item) → benefits (4 catégories) → verify (anti-hallucination) → translate`. Logiciels/compétences/avantages passent en `{nom, explication, niveau}`.
+- **Conseil / matching** : profil candidat (upload PDF → OCR Mistral → structuration), puis par offre un **score de confiance** + synthèse + **points bloquants** + **plan d'attaque** (agents match + calibrage). Recalcul uniquement si match absent ou profil changé.
+- **Refonte de la fiche** : ordre en-tête → résumé → langues → logiciels → compétences techniques → humaines → avantages ; listes explicatives ; description complète sur page dédiée ; en-tête aligné (Table) ; carte de matching en tête.
+- **App** : écran Profil (PDF), tri par pertinence + badge de score sur les tuiles, action « Analyser les offres ».
+
 ### v0.2.0 (2026-07-21) — déploiement + agents dédiés + login email
 - **Déployé en prod** : API sur Render (`https://jobradar-tlqj.onrender.com`), Firebase `jobradar-3610d` (Firestore + règles), 1er scrape validé (30 offres, 0 erreur).
 - **Agents Mistral dédiés** (`JobRadar · Extraction offre`, `JobRadar · Traduction CZ→EN`) créés via l'API et mis en cache Firestore ; repli automatique sur `chat.complete` si la clé n'a pas l'API Agents.

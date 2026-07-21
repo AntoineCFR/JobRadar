@@ -27,6 +27,10 @@ class OfferTile extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (offer.match != null) ...[
+                    _scoreBadge(context, offer.match!.score),
+                    const SizedBox(width: 8),
+                  ],
                   Expanded(
                     child: Text(title,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -74,6 +78,28 @@ class OfferTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _scoreBadge(BuildContext context, int score) {
+    final color = score >= 75
+        ? Colors.green.shade600
+        : score >= 50
+            ? Colors.lightGreen.shade700
+            : score >= 30
+                ? Colors.orange.shade700
+                : Colors.red.shade600;
+    return Container(
+      width: 34,
+      height: 34,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        shape: BoxShape.circle,
+        border: Border.all(color: color, width: 1.5),
+      ),
+      child: Text('$score',
+          style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 12.5)),
     );
   }
 

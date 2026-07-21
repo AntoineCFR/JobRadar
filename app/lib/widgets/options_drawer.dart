@@ -4,20 +4,27 @@ import 'package:provider/provider.dart';
 
 import '../services/auth_service.dart';
 
-/// Drawer latéral : options et actions globales (conforme aux conventions —
-/// tout ce qui n'est pas contextuel passe ici).
+/// Drawer latéral : options et actions globales.
 class OptionsDrawer extends StatelessWidget {
   final VoidCallback onNewSearch;
   final VoidCallback onMarkAllRead;
+  final VoidCallback onOpenProfile;
+  final VoidCallback onRematch;
   final bool unreadOnly;
   final ValueChanged<bool> onUnreadOnlyChanged;
+  final bool sortByRelevance;
+  final ValueChanged<bool> onSortChanged;
 
   const OptionsDrawer({
     super.key,
     required this.onNewSearch,
     required this.onMarkAllRead,
+    required this.onOpenProfile,
+    required this.onRematch,
     required this.unreadOnly,
     required this.onUnreadOnlyChanged,
+    required this.sortByRelevance,
+    required this.onSortChanged,
   });
 
   @override
@@ -44,6 +51,31 @@ class OptionsDrawer extends StatelessWidget {
                 Navigator.pop(context);
                 onNewSearch();
               },
+            ),
+            ListTile(
+              leading: const Icon(Symbols.badge),
+              title: const Text('Mon profil'),
+              subtitle: const Text('CV / compétences pour le matching'),
+              onTap: () {
+                Navigator.pop(context);
+                onOpenProfile();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Symbols.target),
+              title: const Text('Analyser les offres'),
+              subtitle: const Text('(re)calculer les correspondances'),
+              onTap: () {
+                Navigator.pop(context);
+                onRematch();
+              },
+            ),
+            const Divider(height: 1),
+            SwitchListTile(
+              secondary: const Icon(Symbols.sort),
+              title: const Text('Trier par pertinence'),
+              value: sortByRelevance,
+              onChanged: onSortChanged,
             ),
             SwitchListTile(
               secondary: const Icon(Symbols.mark_email_unread),
