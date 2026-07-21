@@ -121,7 +121,10 @@ PROFILE_INSTRUCTIONS = (
     '- "domains": array of {"domain": string, "years": number|null} (fields the '
     "candidate has real experience in).\n"
     '- "hard_skills": string[]; "software": string[]; "soft_skills": string[].\n'
-    '- "languages": array of {"language","level" (CEFR if possible, e.g. B1)}.\n'
+    '- "languages": array of {"language","level"}. Use the level(s) EXACTLY as stated '
+    "in the document, verbatim (e.g. document says English C1-C2 -> \"C1-C2\"; Czech "
+    "\"A2 solide, proche B1\" -> \"A2-B1\"; French natif -> \"C2 (natif)\"). NEVER "
+    "downgrade, round, or invent a level.\n"
     '- "education": string[]; "certifications": string[].\n'
     '- "strengths": string[]; "gaps": string[] (weaknesses vs typical data roles, e.g. '
     "\"no data engineering experience\").\n"

@@ -44,8 +44,12 @@ def profile_version(text: str) -> str:
 
 
 def analyze_profile(text: str) -> Optional[dict]:
-    """Structure le texte du CV/profil via l'agent Profil."""
-    return _ask_agent("profile", f"CANDIDATE DOCUMENT:\n{text}", max_chars=20000)
+    """Structure le texte du CV/profil via l'agent Profil.
+
+    Limite haute : un profil complet (souvent > 20k caractères) doit être lu en
+    ENTIER, sinon des sections en fin de document (ex. Langues) sont tronquées.
+    """
+    return _ask_agent("profile", f"CANDIDATE DOCUMENT:\n{text}", max_chars=120000)
 
 
 _TEXT_EXTS = (".md", ".markdown", ".txt")

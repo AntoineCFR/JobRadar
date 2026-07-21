@@ -264,6 +264,23 @@ def admin_reprocess():
         return jsonify(error=str(e)), 500
 
 
+@app.post("/admin/analyze-profile-text")
+def admin_analyze_profile_text():
+    """Debug : structure un texte de profil et renvoie le résultat (sans stockage)."""
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    text = (request.get_json(silent=True) or {}).get("text", "")
+    if not text:
+        return jsonify(error="text requis"), 400
+    try:
+        from matching import analyze_profile
+
+        return jsonify(structured=analyze_profile(text), chars=len(text))
+    except Exception as e:  # noqa: BLE001
+        log.exception("analyze-profile-text failed")
+        return jsonify(error=str(e)), 500
+
+
 @app.post("/admin/setup-agents")
 def setup_agents():
     """Crée (ou retrouve) les agents Mistral dédiés et renvoie leurs IDs.
