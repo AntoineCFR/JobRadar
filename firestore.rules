@@ -29,5 +29,11 @@ service cloud.firestore {
     match /searches/{searchId} {
       allow read, write: if isAllowed();
     }
+
+    // Profil candidat : lu par l'app pour l'afficher ; écrit par le backend
+    // (Admin SDK). On autorise aussi l'écriture cliente (mono-utilisateur).
+    match /profiles/{uid} {
+      allow read, write: if isAllowed();
+    }
   }
 }

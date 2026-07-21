@@ -83,6 +83,88 @@ def status():
     return jsonify(running=_state["running"], last=_state["last"])
 
 
+@app.post("/profile/analyze")
+def profile_analyze():
+    """Reçoit un PDF de profil (multipart 'file' + 'uid'), l'OCR + le structure,
+    le stocke, puis relance le matching de toutes les offres en tâche de fond."""
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    uid = (request.form.get("uid") or "").strip()
+    file = request.files.get("file")
+    if not uid or not file:
+        return jsonify(error="uid et file requis"), 400
+    try:
+        from matching import build_profile
+        from store import firestore_store
+
+        doc = build_profile(file.read(), file.filename or "profil.pdf")
+        firestore_store.set_profile(uid, doc)
+    except Exception as e:  # noqa: BLE001
+        log.exception("profile analyze failed")
+        return jsonify(error=str(e)), 500
+
+    # Re-match de fond (le profil a changé).
+    def _rematch():
+        try:
+            pipeline.run_matching(force=True)
+        except Exception:  # noqa: BLE001
+            log.exception("re-match after profile failed")
+
+    threading.Thread(target=_rematch, daemon=True).start()
+    return jsonify(status="ok", version=doc["version"], structured=doc["structured"]), 200
+
+
+@app.post("/match")
+def match():
+    """Relance le matching des offres en attente (missing/stale) en tâche de fond."""
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    force = bool((request.get_json(silent=True) or {}).get("force"))
+
+    def _run():
+        try:
+            pipeline.run_matching(force=force)
+        except Exception:  # noqa: BLE001
+            log.exception("match run failed")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify(status="started"), 202
+
+
+@app.post("/admin/reprocess")
+def admin_reprocess():
+    """Re-passe une offre existante dans la chaîne d'extraction (validation/debug).
+
+    Body {id}. Renvoie les champs enrichis pour inspection.
+    """
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    offer_id = str((request.get_json(silent=True) or {}).get("id") or "")
+    if not offer_id:
+        return jsonify(error="id requis"), 400
+    try:
+        from store import firestore_store
+        from extraction.agents import process_offer
+
+        offer = firestore_store.get_offer(offer_id)
+        if not offer:
+            return jsonify(error="offre introuvable"), 404
+        offer["id"] = offer_id
+        offer = process_offer(offer)
+        firestore_store.upsert_offer(offer)
+        return jsonify(
+            id=offer_id,
+            software=offer.get("software"),
+            technical_skills=offer.get("technical_skills"),
+            soft_skills=offer.get("soft_skills"),
+            benefits_categorized=offer.get("benefits_categorized"),
+            summary=offer.get("summary"),
+        )
+    except Exception as e:  # noqa: BLE001
+        log.exception("reprocess failed")
+        return jsonify(error=str(e)), 500
+
+
 @app.post("/admin/setup-agents")
 def setup_agents():
     """Crée (ou retrouve) les agents Mistral dédiés et renvoie leurs IDs.

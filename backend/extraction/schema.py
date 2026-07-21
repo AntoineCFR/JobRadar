@@ -112,6 +112,8 @@ def base_record_from_graphql(card, job_ad: Optional[dict]) -> dict:
         "languages": [],
         "salary": None,
         "benefits": [],
+        "benefits_categorized": None,
+        "extraction_version": None,
         "summary": "",
         "description_html": "",
         "description_text": "",

@@ -123,6 +123,45 @@ def get_daily_searches(seed_if_empty: bool = True) -> list[dict]:
     return list(config.DEFAULT_DAILY_SEARCHES)
 
 
+def get_offer(offer_id: str) -> dict | None:
+    db = init()
+    snap = db.collection(config.FIRESTORE_OFFERS_COLLECTION).document(offer_id).get()
+    return snap.to_dict() if snap.exists else None
+
+
+def get_profile(uid: str) -> dict | None:
+    db = init()
+    snap = db.collection(config.FIRESTORE_PROFILES_COLLECTION).document(uid).get()
+    return snap.to_dict() if snap.exists else None
+
+
+def set_profile(uid: str, data: dict) -> None:
+    db = init()
+    db.collection(config.FIRESTORE_PROFILES_COLLECTION).document(uid).set(data, merge=True)
+
+
+def first_profile() -> tuple[str, dict] | None:
+    """App mono-utilisateur : renvoie (uid, profil) du 1er profil trouvé, ou None."""
+    db = init()
+    for d in db.collection(config.FIRESTORE_PROFILES_COLLECTION).limit(1).stream():
+        return d.id, (d.to_dict() or {})
+    return None
+
+
+def stream_offers() -> list[tuple[str, dict]]:
+    db = init()
+    return [(d.id, d.to_dict() or {}) for d in db.collection(config.FIRESTORE_OFFERS_COLLECTION).stream()]
+
+
+def set_offer_match(offer_id: str, match: dict, profile_version: str) -> None:
+    db = init()
+    payload = dict(match)
+    payload["profile_version"] = profile_version
+    db.collection(config.FIRESTORE_OFFERS_COLLECTION).document(offer_id).set(
+        {"match": payload}, merge=True
+    )
+
+
 def record_run(summary: dict) -> str:
     """Enregistre un run de scraping ; retourne l'id du doc."""
     from firebase_admin import firestore

@@ -51,6 +51,7 @@ FIRESTORE_RUNS_COLLECTION = _get("FIRESTORE_RUNS_COLLECTION", "scrape_runs")
 FIRESTORE_TOKENS_COLLECTION = _get("FIRESTORE_TOKENS_COLLECTION", "device_tokens")
 FIRESTORE_SEARCHES_COLLECTION = _get("FIRESTORE_SEARCHES_COLLECTION", "searches")
 FIRESTORE_CONFIG_COLLECTION = _get("FIRESTORE_CONFIG_COLLECTION", "config")
+FIRESTORE_PROFILES_COLLECTION = _get("FIRESTORE_PROFILES_COLLECTION", "profiles")
 
 # Recherches surveillées par défaut par le cron quotidien, utilisées pour amorcer
 # la collection Firestore `searches` à son premier passage (ensuite gérées côté

@@ -1,8 +1,12 @@
-"""Agents Mistral : traduction cz->en + extraction des champs non structurés.
+"""Agents Mistral — pipeline d'extraction multi-agents.
 
-On utilise deux **agents dédiés** (créés via l'API, visibles dans la console —
-voir agents_setup.py), interrogés en mode conversation. Chaque agent renvoie du
-JSON, parsé de façon tolérante.
+Chaîne par offre :
+  (traduction cz->en) -> extract -> data_expert (ordre+explications) ->
+  benefits (catégorisation) -> verify (contrôle de fidélité).
+
+Chaque étape est un agent dédié (voir agents_setup.py), interrogé en mode
+conversation, avec repli automatique sur chat.complete si l'API Agents n'est pas
+accessible avec la clé courante.
 """
 from __future__ import annotations
 
@@ -16,23 +20,22 @@ from extraction.agents_setup import ensure_agents, _SPECS
 
 log = logging.getLogger("jobradar.agents")
 
+EXTRACTION_VERSION = 2  # incrémenter pour forcer un re-traitement des offres
+
 _client = None
-# Passe à True si l'API Agents est inaccessible (clé sans permission) : on cesse
-# alors de retenter la création à chaque offre et on va droit au repli chat.
 _agents_disabled = False
 
 
 def _get_client():
     global _client
     if _client is None:
-        from mistralai.client import Mistral  # SDK v2.x : le client est dans mistralai.client
+        from mistralai.client import Mistral
 
         _client = Mistral(api_key=MISTRAL_API_KEY, timeout_ms=180000)
     return _client
 
 
 def _last_text(conversation) -> str:
-    """Texte du dernier message assistant (outputs mélange plusieurs types)."""
     for out in reversed(getattr(conversation, "outputs", []) or []):
         if getattr(out, "type", None) != "message.output":
             continue
@@ -46,8 +49,6 @@ def _last_text(conversation) -> str:
 
 
 def _loads_json(text: str) -> Optional[dict]:
-    """Parse tolérant : retire les fences markdown, isole { … }, vire les virgules
-    finales. Renvoie None si vraiment impossible."""
     if not text:
         return None
     t = text.strip()
@@ -68,11 +69,6 @@ def _loads_json(text: str) -> Optional[dict]:
 
 
 def _chat_fallback(agent_key: str, user_text: str, max_chars: int) -> Optional[dict]:
-    """Repli : appel direct chat.complete avec les MÊMES instructions que l'agent.
-
-    Utilisé si la clé Mistral n'a pas accès à l'API Agents (beta). Fonctionnement
-    identique du point de vue métier.
-    """
     client = _get_client()
     resp = client.chat.complete(
         model=MISTRAL_MODEL,
@@ -86,14 +82,11 @@ def _chat_fallback(agent_key: str, user_text: str, max_chars: int) -> Optional[d
     return _loads_json(resp.choices[0].message.content)
 
 
-def _ask_agent(agent_key: str, user_text: str, max_chars: int = 12000) -> Optional[dict]:
-    """Interroge l'agent dédié ; repli automatique sur chat.complete si l'API
-    Agents n'est pas accessible avec la clé courante."""
+def _ask_agent(agent_key: str, user_text: str, max_chars: int = 14000) -> Optional[dict]:
+    """Interroge l'agent dédié ; repli auto sur chat.complete si l'API Agents KO."""
     global _agents_disabled
     if not MISTRAL_API_KEY:
-        log.warning("MISTRAL_API_KEY absent : agents désactivés")
         return None
-    # 1) voie agent dédié (sautée si déjà constatée indisponible)
     if not _agents_disabled:
         try:
             client = _get_client()
@@ -104,17 +97,51 @@ def _ask_agent(agent_key: str, user_text: str, max_chars: int = 12000) -> Option
                 return out
         except Exception as e:  # noqa: BLE001
             _agents_disabled = True
-            log.warning("API Agents indisponible (%s) -> repli chat.complete pour ce process", e)
-    # 2) repli chat.complete
+            log.warning("API Agents indisponible (%s) -> repli chat.complete", e)
     try:
         return _chat_fallback(agent_key, user_text, max_chars)
-    except Exception as e:  # noqa: BLE001 - ne jamais casser le pipeline
+    except Exception as e:  # noqa: BLE001
         log.warning("repli chat '%s' échoué: %s", agent_key, e)
         return None
 
 
 # --------------------------------------------------------------------------- #
-# Agent 1 : traduction
+# Helpers de normalisation
+# --------------------------------------------------------------------------- #
+def _named_list(items) -> list[dict]:
+    """Coerce une liste (str ou dict) en [{name, explanation, level}]."""
+    out = []
+    for it in items or []:
+        if isinstance(it, str):
+            out.append({"name": it, "explanation": "", "level": None})
+        elif isinstance(it, dict) and it.get("name"):
+            out.append({
+                "name": str(it["name"]),
+                "explanation": str(it.get("explanation", "") or ""),
+                "level": it.get("level"),
+            })
+    return out
+
+
+def _named_pairs(items) -> list[dict]:
+    out = []
+    for it in items or []:
+        if isinstance(it, str):
+            out.append({"name": it, "explanation": ""})
+        elif isinstance(it, dict) and it.get("name"):
+            out.append({"name": str(it["name"]), "explanation": str(it.get("explanation", "") or "")})
+    return out
+
+
+_BENEFIT_CATS = ("flexibility", "financial", "training", "other")
+
+
+def _empty_benefits() -> dict:
+    return {c: [] for c in _BENEFIT_CATS}
+
+
+# --------------------------------------------------------------------------- #
+# Étapes
 # --------------------------------------------------------------------------- #
 def translate_to_english(title: str, text: str) -> Optional[dict]:
     out = _ask_agent("translate", f"TITLE: {title}\n\nOFFER (Czech):\n{text}")
@@ -127,36 +154,17 @@ def translate_to_english(title: str, text: str) -> Optional[dict]:
     }
 
 
-# --------------------------------------------------------------------------- #
-# Agent 2 : extraction / enrichissement
-# --------------------------------------------------------------------------- #
-def enrich_offer(text: str, hints: Optional[dict] = None) -> Optional[dict]:
-    hints = hints or {}
-    hint_str = json.dumps(
-        {
-            k: hints.get(k)
-            for k in ("title", "company", "location_city", "location_country",
-                      "sector", "languages", "education", "contract_type")
-        },
-        ensure_ascii=False,
-    )
-    return _ask_agent("extract", f"KNOWN STRUCTURED HINTS: {hint_str}\n\nOFFER TEXT:\n{text}")
-
-
-# --------------------------------------------------------------------------- #
-# Orchestration d'une offre
-# --------------------------------------------------------------------------- #
 def process_offer(rec: dict) -> dict:
-    """Complète un enregistrement d'offre (base GraphQL) avec les agents Mistral.
+    """Enrichit un enregistrement d'offre via la chaîne d'agents.
 
     Sans clé Mistral, renvoie `rec` inchangé (le structuré GraphQL reste dispo).
     """
     source_lang = (rec.get("source_language") or "").lower()
     original_text = rec.get("description_text") or ""
     working_title = rec.get("title") or ""
-
-    # 1) Traduction si tchèque -> on garde les 2 versions.
     working_text = original_text
+
+    # 0) Traduction cz -> en (on garde les 2 versions).
     if source_lang.startswith("cs") and original_text:
         tr = translate_to_english(working_title, original_text)
         if tr:
@@ -169,23 +177,68 @@ def process_offer(rec: dict) -> dict:
             working_text = tr["description_text"] or original_text
             working_title = tr["title"] or working_title
 
-    # 2) Extraction sur le texte anglais.
-    if working_text:
-        data = enrich_offer(working_text, hints=rec)
-        if data:
-            rec["summary"] = data.get("summary") or rec.get("summary") or ""
-            rec["experience_years"] = data.get("experience_years")
-            rec["education"] = data.get("education") or rec.get("education") or ""
-            rec["soft_skills"] = data.get("soft_skills") or []
-            rec["technical_skills"] = data.get("technical_skills") or []
-            rec["software"] = data.get("software") or []
-            rec["work_arrangement"] = data.get("work_arrangement") or ""
-            if data.get("languages"):
-                rec["languages"] = data["languages"]
-            if data.get("company"):
-                rec["company"] = data["company"]
-            # Mistral fait autorité sur l'intermédiaire.
-            rec["intermediary"] = data.get("intermediary") or ""
+    if not working_text:
+        rec["extraction_version"] = EXTRACTION_VERSION
+        return rec
+
+    # 1) Extraction de base.
+    raw_software, raw_tech = [], []
+    base = _ask_agent("extract", f"OFFER TEXT:\n{working_text}")
+    if base:
+        rec["summary"] = base.get("summary") or rec.get("summary") or ""
+        rec["experience_years"] = base.get("experience_years")
+        rec["education"] = base.get("education") or rec.get("education") or ""
+        rec["work_arrangement"] = base.get("work_arrangement") or ""
+        rec["soft_skills"] = [s for s in (base.get("soft_skills") or []) if isinstance(s, str)]
+        if base.get("languages"):
+            rec["languages"] = base["languages"]
+        if base.get("company"):
+            rec["company"] = base["company"]
+        rec["intermediary"] = base.get("intermediary") or ""
+        raw_software = base.get("software") or []
+        raw_tech = base.get("technical_skills") or []
+
+    # 2) Expert Data : ordre + explications.
+    software = _named_list(raw_software)
+    technical = _named_list(raw_tech)
+    if raw_software or raw_tech:
+        de = _ask_agent(
+            "data_expert",
+            f"INPUT: {json.dumps({'software': raw_software, 'technical_skills': raw_tech}, ensure_ascii=False)}"
+            f"\n\nOFFER TEXT:\n{working_text}",
+        )
+        if de:
+            software = _named_list(de.get("software")) or software
+            technical = _named_list(de.get("technical_skills")) or technical
+
+    # 3) Avantages : catégorisation (source = benefits GraphQL + texte).
+    raw_benefits = rec.get("benefits") or []
+    benefits_cat = _empty_benefits()
+    benefits_cat["other"] = _named_pairs(raw_benefits)
+    if raw_benefits:
+        bn = _ask_agent(
+            "benefits",
+            f"BENEFITS: {json.dumps(raw_benefits, ensure_ascii=False)}\n\nOFFER TEXT:\n{working_text}",
+        )
+        if bn:
+            benefits_cat = {c: _named_pairs(bn.get(c)) for c in _BENEFIT_CATS}
+
+    # 4) Vérificateur de fidélité.
+    draft = {"software": software, "technical_skills": technical, "benefits": benefits_cat}
+    vr = _ask_agent(
+        "verify",
+        f"OFFER TEXT:\n{working_text}\n\nDRAFT JSON:\n{json.dumps(draft, ensure_ascii=False)}",
+    )
+    if vr:
+        software = _named_list(vr.get("software")) or software
+        technical = _named_list(vr.get("technical_skills")) or technical
+        if isinstance(vr.get("benefits"), dict):
+            benefits_cat = {c: _named_pairs(vr["benefits"].get(c)) for c in _BENEFIT_CATS}
+
+    rec["software"] = software
+    rec["technical_skills"] = technical
+    rec["benefits_categorized"] = benefits_cat
+    rec["extraction_version"] = EXTRACTION_VERSION
 
     if rec.get("intermediary") and not rec.get("company"):
         rec["company"] = "inconnu"

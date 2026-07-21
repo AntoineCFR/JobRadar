@@ -94,5 +94,49 @@ def run_scrape(
 
         notify_new_offers(len(new_offers), [o["title"] for o in new_offers])
 
+    # Matching automatique des offres en attente (si un profil existe).
+    if persist and new_offers:
+        try:
+            matched = run_matching()
+            summary["matched"] = matched
+        except Exception as e:  # noqa: BLE001
+            log.warning("matching post-scrape échoué: %s", e)
+
     log.info("run terminé: %s", {k: summary[k] for k in ("total_found", "new_count", "processed", "errors")})
     return summary
+
+
+def run_matching(force: bool = False) -> int:
+    """Calcule le matching des offres en attente pour le profil courant.
+
+    Ne (re)calcule une offre que si `match` absent, ou si la version du profil
+    ou du modèle de matching a changé (sauf `force=True`). Renvoie le nombre
+    d'offres (re)matchées.
+    """
+    from store import firestore_store
+    from matching import match_offer, MATCH_VERSION
+
+    prof = firestore_store.first_profile()
+    if not prof:
+        log.info("run_matching: aucun profil, rien à faire")
+        return 0
+    _, profile = prof
+    pv = profile.get("version", "")
+    pstruct = profile.get("structured") or {}
+
+    matched = 0
+    for offer_id, offer in firestore_store.stream_offers():
+        m = offer.get("match")
+        up_to_date = (
+            m
+            and m.get("profile_version") == pv
+            and m.get("match_version") == MATCH_VERSION
+        )
+        if up_to_date and not force:
+            continue
+        result = match_offer(pstruct, offer)
+        if result:
+            firestore_store.set_offer_match(offer_id, result, pv)
+            matched += 1
+    log.info("run_matching: %s offres (re)matchées (profil %s)", matched, pv)
+    return matched
