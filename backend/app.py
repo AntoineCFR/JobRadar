@@ -83,5 +83,24 @@ def status():
     return jsonify(running=_state["running"], last=_state["last"])
 
 
+@app.post("/admin/setup-agents")
+def setup_agents():
+    """Crée (ou retrouve) les agents Mistral dédiés et renvoie leurs IDs.
+
+    Protégé par le secret partagé. Idempotent : ne crée pas de doublon.
+    """
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    try:
+        from extraction.agents import _get_client
+        from extraction.agents_setup import ensure_agents
+
+        ids = ensure_agents(_get_client())
+        return jsonify(status="ok", agents=ids)
+    except Exception as e:  # noqa: BLE001
+        log.exception("setup-agents failed")
+        return jsonify(error=str(e)), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=config.PORT)

@@ -17,8 +17,21 @@ class AuthService {
     return _auth.signInWithCredential(credential);
   }
 
+  /// Connexion email/mot de passe (pratique pour tester sur émulateur, où
+  /// Google Sign-In n'est souvent pas disponible).
+  Future<UserCredential> signInWithEmail(String email, String password) {
+    return _auth.signInWithEmailAndPassword(email: email.trim(), password: password);
+  }
+
+  /// Création d'un compte email/mot de passe.
+  Future<UserCredential> registerWithEmail(String email, String password) {
+    return _auth.createUserWithEmailAndPassword(email: email.trim(), password: password);
+  }
+
   Future<void> signOut() async {
-    await GoogleSignIn.instance.signOut();
+    try {
+      await GoogleSignIn.instance.signOut();
+    } catch (_) {}
     await _auth.signOut();
   }
 }

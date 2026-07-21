@@ -16,6 +16,9 @@ def _get(name: str, default: str = "") -> str:
 # --- Mistral (agents d'extraction / traduction) ---
 MISTRAL_API_KEY = _get("MISTRAL_API_KEY")
 MISTRAL_MODEL = _get("MISTRAL_MODEL", "mistral-small-latest")
+# IDs d'agents dédiés (optionnels : sinon créés à la volée et mis en cache Firestore).
+MISTRAL_EXTRACT_AGENT_ID = _get("MISTRAL_EXTRACT_AGENT_ID")
+MISTRAL_TRANSLATE_AGENT_ID = _get("MISTRAL_TRANSLATE_AGENT_ID")
 
 # --- Firebase / Firestore (source de vérité lue par l'app) ---
 # Deux façons de fournir le service account :
@@ -47,6 +50,7 @@ FIRESTORE_OFFERS_COLLECTION = _get("FIRESTORE_OFFERS_COLLECTION", "offers")
 FIRESTORE_RUNS_COLLECTION = _get("FIRESTORE_RUNS_COLLECTION", "scrape_runs")
 FIRESTORE_TOKENS_COLLECTION = _get("FIRESTORE_TOKENS_COLLECTION", "device_tokens")
 FIRESTORE_SEARCHES_COLLECTION = _get("FIRESTORE_SEARCHES_COLLECTION", "searches")
+FIRESTORE_CONFIG_COLLECTION = _get("FIRESTORE_CONFIG_COLLECTION", "config")
 
 # Recherches surveillées par défaut par le cron quotidien, utilisées pour amorcer
 # la collection Firestore `searches` à son premier passage (ensuite gérées côté

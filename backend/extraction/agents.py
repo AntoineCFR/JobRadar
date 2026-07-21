@@ -1,24 +1,25 @@
 """Agents Mistral : traduction cz->en + extraction des champs non structurés.
 
-Deux agents (comme le pattern EducaQuiz) :
-  - `translate_to_english()` : traduit une offre tchèque en anglais.
-  - `enrich_offer()` : déduit du texte les champs qu'aucune API ne donne
-    (soft/hard skills, logiciels, années d'XP, nécessité d'une langue,
-    mode de travail remote/hybride, résumé court).
-
-Tout passe par le mode JSON de Mistral pour une sortie parsable.
+On utilise deux **agents dédiés** (créés via l'API, visibles dans la console —
+voir agents_setup.py), interrogés en mode conversation. Chaque agent renvoie du
+JSON, parsé de façon tolérante.
 """
 from __future__ import annotations
 
+import re
 import json
 import logging
 from typing import Optional
 
 from config import MISTRAL_API_KEY, MISTRAL_MODEL
+from extraction.agents_setup import ensure_agents, _SPECS
 
 log = logging.getLogger("jobradar.agents")
 
 _client = None
+# Passe à True si l'API Agents est inaccessible (clé sans permission) : on cesse
+# alors de retenter la création à chaque offre et on va droit au repli chat.
+_agents_disabled = False
 
 
 def _get_client():
@@ -26,47 +27,97 @@ def _get_client():
     if _client is None:
         from mistralai.client import Mistral  # SDK v2.x : le client est dans mistralai.client
 
-        _client = Mistral(api_key=MISTRAL_API_KEY)
+        _client = Mistral(api_key=MISTRAL_API_KEY, timeout_ms=180000)
     return _client
 
 
-def _chat_json(system: str, user: str, max_chars: int = 12000) -> Optional[dict]:
-    """Appelle Mistral en mode JSON et renvoie le dict, ou None en cas d'échec."""
+def _last_text(conversation) -> str:
+    """Texte du dernier message assistant (outputs mélange plusieurs types)."""
+    for out in reversed(getattr(conversation, "outputs", []) or []):
+        if getattr(out, "type", None) != "message.output":
+            continue
+        content = getattr(out, "content", None)
+        if content is None:
+            continue
+        if isinstance(content, str):
+            return content
+        return "".join(getattr(c, "text", "") for c in content)
+    return ""
+
+
+def _loads_json(text: str) -> Optional[dict]:
+    """Parse tolérant : retire les fences markdown, isole { … }, vire les virgules
+    finales. Renvoie None si vraiment impossible."""
+    if not text:
+        return None
+    t = text.strip()
+    if "```" in t:
+        m = re.search(r"```(?:json)?\s*(.*?)```", t, re.S)
+        if m:
+            t = m.group(1).strip()
+    start, end = t.find("{"), t.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return None
+    frag = t[start : end + 1]
+    for candidate in (frag, re.sub(r",(\s*[}\]])", r"\1", frag)):
+        try:
+            return json.loads(candidate, strict=False)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def _chat_fallback(agent_key: str, user_text: str, max_chars: int) -> Optional[dict]:
+    """Repli : appel direct chat.complete avec les MÊMES instructions que l'agent.
+
+    Utilisé si la clé Mistral n'a pas accès à l'API Agents (beta). Fonctionnement
+    identique du point de vue métier.
+    """
+    client = _get_client()
+    resp = client.chat.complete(
+        model=MISTRAL_MODEL,
+        messages=[
+            {"role": "system", "content": _SPECS[agent_key]["instructions"]},
+            {"role": "user", "content": user_text[:max_chars]},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.1,
+    )
+    return _loads_json(resp.choices[0].message.content)
+
+
+def _ask_agent(agent_key: str, user_text: str, max_chars: int = 12000) -> Optional[dict]:
+    """Interroge l'agent dédié ; repli automatique sur chat.complete si l'API
+    Agents n'est pas accessible avec la clé courante."""
+    global _agents_disabled
     if not MISTRAL_API_KEY:
         log.warning("MISTRAL_API_KEY absent : agents désactivés")
         return None
+    # 1) voie agent dédié (sautée si déjà constatée indisponible)
+    if not _agents_disabled:
+        try:
+            client = _get_client()
+            agent_id = ensure_agents(client)[agent_key]
+            convo = client.beta.conversations.start(agent_id=agent_id, inputs=user_text[:max_chars])
+            out = _loads_json(_last_text(convo))
+            if out is not None:
+                return out
+        except Exception as e:  # noqa: BLE001
+            _agents_disabled = True
+            log.warning("API Agents indisponible (%s) -> repli chat.complete pour ce process", e)
+    # 2) repli chat.complete
     try:
-        resp = _get_client().chat.complete(
-            model=MISTRAL_MODEL,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user[:max_chars]},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.1,
-        )
-        content = resp.choices[0].message.content
-        return json.loads(content)
-    except Exception as e:  # noqa: BLE001 - on ne veut jamais casser le pipeline
-        log.warning("Mistral call failed: %s", e)
+        return _chat_fallback(agent_key, user_text, max_chars)
+    except Exception as e:  # noqa: BLE001 - ne jamais casser le pipeline
+        log.warning("repli chat '%s' échoué: %s", agent_key, e)
         return None
 
 
 # --------------------------------------------------------------------------- #
 # Agent 1 : traduction
 # --------------------------------------------------------------------------- #
-_TRANSLATE_SYSTEM = (
-    "You are a professional translator for job advertisements. Translate the "
-    "given Czech job offer into natural, professional English. Keep the meaning "
-    "and tone. Do NOT invent information. Return ONLY a JSON object with keys: "
-    '"title" (string), "summary" (string, 2-3 sentences), "description_text" '
-    "(string, the full offer translated, keep line breaks/bullets)."
-)
-
-
 def translate_to_english(title: str, text: str) -> Optional[dict]:
-    user = f"TITLE: {title}\n\nOFFER (Czech):\n{text}"
-    out = _chat_json(_TRANSLATE_SYSTEM, user)
+    out = _ask_agent("translate", f"TITLE: {title}\n\nOFFER (Czech):\n{text}")
     if not out:
         return None
     return {
@@ -79,43 +130,17 @@ def translate_to_english(title: str, text: str) -> Optional[dict]:
 # --------------------------------------------------------------------------- #
 # Agent 2 : extraction / enrichissement
 # --------------------------------------------------------------------------- #
-_ENRICH_SYSTEM = (
-    "You extract structured data from a job advertisement (written in English). "
-    "Return ONLY a JSON object. Be faithful to the text; use null / empty arrays "
-    "when the information is absent. Do not invent. JSON keys:\n"
-    '- "summary": string, 2-3 sentence neutral summary in English.\n'
-    '- "experience_years": integer or null (minimum years of experience required).\n'
-    '- "education": string or null (required/desired level of study).\n'
-    '- "soft_skills": string[] (human/interpersonal skills).\n'
-    '- "technical_skills": string[] (hard/technical skills, methods, domains).\n'
-    '- "software": string[] (named tools/software/technologies, e.g. Python, Power BI, SAP).\n'
-    '- "work_arrangement": one of "on-site","hybrid","remote", or null.\n'
-    '- "languages": array of {"language": string, "level": string|null, '
-    '"mandatory": boolean, "reason": string}. Infer a language as mandatory even '
-    "if not explicit when the context implies it (e.g. Czech required because the "
-    'role serves Czech clients or is Czech-speaking). Fill "reason" with a short '
-    "justification.\n"
-    '- "company": string or null (the actual hiring/end company if identifiable).\n'
-    '- "intermediary": string or null. Fill ONLY when a staffing/recruitment '
-    "AGENCY is posting on behalf of a different end-client company. Return null "
-    "for a company hiring for itself, including its own subsidiaries or entities "
-    "of the same corporate group (same brand/name family is NOT an intermediary).\n"
-)
-
-
 def enrich_offer(text: str, hints: Optional[dict] = None) -> Optional[dict]:
     hints = hints or {}
     hint_str = json.dumps(
         {
             k: hints.get(k)
-            for k in ("title", "company", "location_city",
-                      "location_country", "sector", "languages", "education",
-                      "contract_type")
+            for k in ("title", "company", "location_city", "location_country",
+                      "sector", "languages", "education", "contract_type")
         },
         ensure_ascii=False,
     )
-    user = f"KNOWN STRUCTURED HINTS: {hint_str}\n\nOFFER TEXT:\n{text}"
-    return _chat_json(_ENRICH_SYSTEM, user)
+    return _ask_agent("extract", f"KNOWN STRUCTURED HINTS: {hint_str}\n\nOFFER TEXT:\n{text}")
 
 
 # --------------------------------------------------------------------------- #
@@ -124,8 +149,7 @@ def enrich_offer(text: str, hints: Optional[dict] = None) -> Optional[dict]:
 def process_offer(rec: dict) -> dict:
     """Complète un enregistrement d'offre (base GraphQL) avec les agents Mistral.
 
-    Modifie et renvoie `rec`. Sans clé Mistral, renvoie `rec` inchangé (les
-    champs structurés GraphQL restent disponibles).
+    Sans clé Mistral, renvoie `rec` inchangé (le structuré GraphQL reste dispo).
     """
     source_lang = (rec.get("source_language") or "").lower()
     original_text = rec.get("description_text") or ""
@@ -160,12 +184,9 @@ def process_offer(rec: dict) -> dict:
                 rec["languages"] = data["languages"]
             if data.get("company"):
                 rec["company"] = data["company"]
-            # Mistral fait autorité sur l'intermédiaire (l'heuristique GraphQL
-            # sur contactCompanyName donne des faux positifs intra-groupe).
+            # Mistral fait autorité sur l'intermédiaire.
             rec["intermediary"] = data.get("intermediary") or ""
 
-    # Règle métier : si un intermédiaire est identifié mais pas l'entreprise
-    # réelle, on marque l'entreprise comme "inconnu".
     if rec.get("intermediary") and not rec.get("company"):
         rec["company"] = "inconnu"
     return rec

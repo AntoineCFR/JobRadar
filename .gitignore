@@ -3,6 +3,10 @@
 **/serviceAccount.json
 **/*serviceAccount*.json
 
+# Config client Firebase (identifiants ; fournis au build via Codemagic / local)
+app/android/app/google-services.json
+app/ios/Runner/GoogleService-Info.plist
+
 # Python
 **/venv/
 **/__pycache__/

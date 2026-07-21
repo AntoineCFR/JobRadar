@@ -82,6 +82,18 @@ def upsert_offer(rec: dict, search_ctx: Optional[dict] = None) -> bool:
     return is_new
 
 
+def get_config(doc_id: str) -> dict | None:
+    """Lit un doc de la collection `config` (ex. IDs d'agents Mistral)."""
+    db = init()
+    snap = db.collection(config.FIRESTORE_CONFIG_COLLECTION).document(doc_id).get()
+    return snap.to_dict() if snap.exists else None
+
+
+def set_config(doc_id: str, data: dict) -> None:
+    db = init()
+    db.collection(config.FIRESTORE_CONFIG_COLLECTION).document(doc_id).set(data, merge=True)
+
+
 def get_daily_searches(seed_if_empty: bool = True) -> list[dict]:
     """Recherches à lancer par le cron, lues depuis la collection `searches`.
 
