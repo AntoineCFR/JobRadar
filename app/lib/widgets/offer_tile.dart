@@ -3,8 +3,8 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../models/offer.dart';
 
-/// Tuile d'offre : à gauche titre/entreprise/lieu ; à droite 2 indicateurs
-/// (langue, junior) + la jauge de compatibilité.
+/// Tuile d'offre : à gauche titre/entreprise/lieu/date ; à droite les
+/// indicateurs (langue, junior) + les jauges Pertinence et Match.
 class OfferTile extends StatelessWidget {
   final Offer offer;
   final VoidCallback onTap;
@@ -18,20 +18,6 @@ class OfferTile extends StatelessWidget {
               ? Colors.orange.shade700
               : Colors.red.shade600;
 
-  String? get _publishedLabel {
-    final iso = offer.publishedAt;
-    if (iso == null || iso.isEmpty) return null;
-    final d = DateTime.tryParse(iso);
-    if (d == null) return null;
-    return 'Publiée le ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-  }
-
-  RequiredLanguage? get _mainLanguage {
-    final mand = offer.languages.where((l) => l.mandatory).toList();
-    final pool = mand.isNotEmpty ? mand : offer.languages;
-    return pool.isEmpty ? null : pool.first;
-  }
-
   bool _isCzech(String l) {
     final s = l.toLowerCase();
     return s.contains('tch') || s.contains('cze') || s.contains('czech') || s.contains('češ') || s == 'cs';
@@ -42,10 +28,43 @@ class OfferTile extends StatelessWidget {
     return s.contains('angl') || s.contains('engl') || s == 'en';
   }
 
+  /// Le tchèque impératif est un critère bloquant : il prime sur les autres langues.
+  RequiredLanguage? get _czechBarrier {
+    for (final l in offer.languages) {
+      if (l.mandatory && _isCzech(l.language)) return l;
+    }
+    return null;
+  }
+
+  RequiredLanguage? get _displayLanguage {
+    if (_czechBarrier != null) return _czechBarrier;
+    final mand = offer.languages.where((l) => l.mandatory).toList();
+    final pool = mand.isNotEmpty ? mand : offer.languages;
+    return pool.isEmpty ? null : pool.first;
+  }
+
+  String? get _publishedLabel {
+    final iso = offer.publishedAt;
+    if (iso == null || iso.isEmpty) return null;
+    final d = DateTime.tryParse(iso);
+    if (d == null) return null;
+    return 'Publiée le ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  }
+
+  /// Info-bulle noire discrète, déclenchée au clic (mobile-friendly).
+  Widget _tip(String msg, Widget child) => Tooltip(
+        message: msg,
+        triggerMode: TooltipTriggerMode.tap,
+        preferBelow: false,
+        decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(6)),
+        textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: child,
+      );
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final title = offer.displayTitle;
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -62,7 +81,7 @@ class OfferTile extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: Text(title,
+                          child: Text(offer.displayTitle,
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w600, height: 1.2)),
                         ),
@@ -91,12 +110,11 @@ class OfferTile extends StatelessWidget {
   }
 
   Widget _rightColumn(BuildContext context) {
-    final lang = _mainLanguage;
+    final lang = _displayLanguage;
     final junior = offer.experienceYears != null && offer.experienceYears! <= 1;
     final senior = offer.experienceYears != null && offer.experienceYears! >= 4;
-    final m = offer.match;
     return SizedBox(
-      width: 74,
+      width: 84,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -105,16 +123,25 @@ class OfferTile extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               if (junior)
-                _statusIcon(Symbols.local_florist, Colors.green.shade600, 'Junior OK (≤ 1 an)'),
+                _tip('Poste junior : ≤ 1 an d\'expérience demandé',
+                    Icon(Symbols.local_florist, size: 18, color: Colors.green.shade600)),
               if (senior)
-                _statusIcon(Symbols.workspace_premium, Colors.orange.shade700,
-                    'Expérience élevée demandée'),
-              if (lang != null) _langBadge(lang),
+                _tip('Expérience élevée demandée (≥ 4 ans)',
+                    Icon(Symbols.workspace_premium, size: 18, color: Colors.orange.shade700)),
+              if (lang != null) ...[const SizedBox(width: 4), _langBadge(lang)],
             ],
           ),
-          if (m != null) ...[
-            const SizedBox(height: 10),
-            _compat(context, m.score),
+          if (offer.relevanceScore != null) ...[
+            const SizedBox(height: 9),
+            _gauge(context, 'Pertinence', offer.relevanceScore!,
+                tip: offer.relevanceReason.isNotEmpty
+                    ? 'Pertinence vs ta recherche : ${offer.relevanceReason}'
+                    : 'Pertinence de l\'offre par rapport au mot-clé recherché'),
+          ],
+          if (offer.match != null) ...[
+            const SizedBox(height: 9),
+            _gauge(context, 'Match', offer.match!.score,
+                tip: 'Compatibilité avec ton profil'),
           ],
         ],
       ),
@@ -125,13 +152,12 @@ class OfferTile extends StatelessWidget {
     final cz = _isCzech(lang.language);
     final en = _isEnglish(lang.language);
     final flag = cz ? '🇨🇿' : (en ? '🇬🇧' : '🌐');
-    final barrier = cz && lang.mandatory; // le tchèque impératif = frein pour l'utilisateur
-    return Tooltip(
-      message:
-          '${lang.language}${lang.level != null && lang.level!.isNotEmpty ? ' (${lang.level})' : ''}'
-          '${lang.mandatory ? ' — impérative' : ''}',
-      child: Container(
-        margin: const EdgeInsets.only(left: 4),
+    final barrier = cz && lang.mandatory;
+    return _tip(
+      '${lang.language}${lang.level != null && lang.level!.isNotEmpty ? ' (${lang.level})' : ''}'
+      '${lang.mandatory ? ' — impérative' : ''}'
+      '${barrier ? '\nCritère potentiellement bloquant pour toi.' : ''}',
+      Container(
         padding: const EdgeInsets.all(2),
         decoration: barrier
             ? BoxDecoration(
@@ -143,43 +169,45 @@ class OfferTile extends StatelessWidget {
     );
   }
 
-  Widget _statusIcon(IconData icon, Color color, String tip) => Padding(
-        padding: const EdgeInsets.only(left: 4),
-        child: Tooltip(message: tip, child: Icon(icon, size: 18, color: color)),
-      );
-
-  Widget _compat(BuildContext context, int score) {
+  Widget _gauge(BuildContext context, String label, int score, {String? tip}) {
     final color = scoreColor(score);
-    return Column(
+    final bar = Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text('$score%',
-            style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 13)),
-        const SizedBox(height: 3),
+        Row(mainAxisAlignment: MainAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 9.5,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(width: 4),
+          Text('$score%', style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 11.5)),
+        ]),
+        const SizedBox(height: 2),
         ClipRRect(
           borderRadius: BorderRadius.circular(3),
-          child: LinearProgressIndicator(
-            value: score / 100,
-            minHeight: 5,
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-            valueColor: AlwaysStoppedAnimation(color),
+          child: SizedBox(
+            width: 84,
+            child: LinearProgressIndicator(
+              value: (score.clamp(0, 100)) / 100,
+              minHeight: 5,
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
           ),
         ),
       ],
     );
+    return tip != null ? _tip(tip, bar) : bar;
   }
 
   Widget _newDot(ColorScheme scheme) => Container(
         margin: const EdgeInsets.only(left: 8, top: 2),
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration:
-            BoxDecoration(color: scheme.primary, borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(color: scheme.primary, borderRadius: BorderRadius.circular(20)),
         child: Text('NEW',
             style: TextStyle(
-                color: scheme.onPrimary,
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.5)),
+                color: scheme.onPrimary, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
       );
 
   Widget _iconLine(BuildContext context, IconData icon, String text) {
@@ -194,10 +222,7 @@ class OfferTile extends StatelessWidget {
             child: Text(text,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: scheme.onSurfaceVariant)),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
           ),
         ],
       ),

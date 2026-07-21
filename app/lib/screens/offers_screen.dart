@@ -7,13 +7,15 @@ import '../services/offers_service.dart';
 import '../services/scrape_service.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/backend_activity_bar.dart';
+import '../widgets/filter_dialog.dart';
 import '../widgets/offer_tile.dart';
 import '../widgets/options_drawer.dart';
 import '../widgets/scrape_dialog.dart';
 import 'offer_detail_screen.dart';
 import 'profile_screen.dart';
 
-/// Écran principal : liste des offres (tuiles) + lancement de recherche.
+enum SortMode { pertinence, match, date }
+
 class OffersScreen extends StatefulWidget {
   const OffersScreen({super.key});
 
@@ -22,8 +24,8 @@ class OffersScreen extends StatefulWidget {
 }
 
 class _OffersScreenState extends State<OffersScreen> {
-  bool _unreadOnly = false;
-  bool _sortByRelevance = false;
+  SortMode _sort = SortMode.pertinence;
+  OfferFilters _filters = OfferFilters();
   String _query = '';
 
   Future<void> _launchSearch() async {
@@ -32,10 +34,7 @@ class _OffersScreenState extends State<OffersScreen> {
     final req = await ScrapeDialog.show(context);
     if (req == null) return;
     final result = await scrapeService.launch(
-      site: req.site,
-      keyword: req.keyword,
-      location: req.location,
-    );
+        site: req.site, keyword: req.keyword, location: req.location);
     messenger.showSnackBar(SnackBar(content: Text(result.message)));
   }
 
@@ -52,21 +51,56 @@ class _OffersScreenState extends State<OffersScreen> {
   void _openProfile() =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
 
+  Future<void> _openFilters() async {
+    final res = await FilterDialog.show(context, _filters);
+    if (res != null) setState(() => _filters = res);
+  }
+
   List<Offer> _prepare(List<Offer> offers) {
+    final q = _query.toLowerCase();
     var list = offers.where((o) {
-      if (_unreadOnly && o.isRead) return false;
-      if (_query.isEmpty) return true;
-      final q = _query.toLowerCase();
-      return o.title.toLowerCase().contains(q) ||
-          o.company.toLowerCase().contains(q) ||
-          o.software.any((s) => s.name.toLowerCase().contains(q)) ||
-          o.technicalSkills.any((s) => s.name.toLowerCase().contains(q));
+      if (_filters.unreadOnly && o.isRead) return false;
+      if (_filters.juniorOnly && !o.isJunior) return false;
+      if (_filters.hideCzechMandatory && o.requiresMandatoryCzech) return false;
+      if (_filters.minRelevance > 0 &&
+          (o.relevanceScore == null || o.relevanceScore! < _filters.minRelevance)) {
+        return false;
+      }
+      if (_filters.minMatch > 0 && (o.match == null || o.match!.score < _filters.minMatch)) {
+        return false;
+      }
+      if (_filters.workArrangement.isNotEmpty &&
+          !o.workArrangement.toLowerCase().contains(_filters.workArrangement)) {
+        return false;
+      }
+      if (q.isNotEmpty) {
+        final hit = o.title.toLowerCase().contains(q) ||
+            o.company.toLowerCase().contains(q) ||
+            o.software.any((s) => s.name.toLowerCase().contains(q)) ||
+            o.technicalSkills.any((s) => s.name.toLowerCase().contains(q));
+        if (!hit) return false;
+      }
+      return true;
     }).toList();
-    if (_sortByRelevance) {
-      list.sort((a, b) => (b.match?.score ?? -1).compareTo(a.match?.score ?? -1));
+
+    switch (_sort) {
+      case SortMode.pertinence:
+        list.sort((a, b) => (b.relevanceScore ?? -1).compareTo(a.relevanceScore ?? -1));
+        break;
+      case SortMode.match:
+        list.sort((a, b) => (b.match?.score ?? -1).compareTo(a.match?.score ?? -1));
+        break;
+      case SortMode.date:
+        break; // déjà trié par date de détection (flux Firestore)
     }
     return list;
   }
+
+  String get _sortLabel => switch (_sort) {
+        SortMode.pertinence => 'Pertinence',
+        SortMode.match => 'Compatibilité',
+        SortMode.date => 'Date',
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -77,6 +111,7 @@ class _OffersScreenState extends State<OffersScreen> {
         final all = snapshot.data ?? [];
         final offers = _prepare(all);
         final unread = all.where((o) => !o.isRead).length;
+        final nFilters = _filters.activeCount;
 
         return AppScaffold(
           title: 'Offres',
@@ -85,16 +120,27 @@ class _OffersScreenState extends State<OffersScreen> {
             onMarkAllRead: () => offersService.markAllRead(all),
             onOpenProfile: _openProfile,
             onScanNew: _scanNew,
-            unreadOnly: _unreadOnly,
-            onUnreadOnlyChanged: (v) => setState(() => _unreadOnly = v),
-            sortByRelevance: _sortByRelevance,
-            onSortChanged: (v) => setState(() => _sortByRelevance = v),
           ),
           actions: [
             IconButton(
-              tooltip: 'Trier par pertinence',
-              icon: Icon(_sortByRelevance ? Symbols.sort : Symbols.schedule),
-              onPressed: () => setState(() => _sortByRelevance = !_sortByRelevance),
+              tooltip: 'Filtrer',
+              onPressed: _openFilters,
+              icon: Badge(
+                isLabelVisible: nFilters > 0,
+                label: Text('$nFilters'),
+                child: const Icon(Symbols.filter_alt),
+              ),
+            ),
+            PopupMenuButton<SortMode>(
+              tooltip: 'Trier',
+              icon: const Icon(Symbols.sort),
+              initialValue: _sort,
+              onSelected: (v) => setState(() => _sort = v),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: SortMode.pertinence, child: Text('Trier par pertinence')),
+                PopupMenuItem(value: SortMode.match, child: Text('Trier par compatibilité')),
+                PopupMenuItem(value: SortMode.date, child: Text('Trier par date')),
+              ],
             ),
           ],
           floatingActionButton: FloatingActionButton.extended(
@@ -105,17 +151,15 @@ class _OffersScreenState extends State<OffersScreen> {
           footer: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  const Icon(Symbols.radar, size: 16),
-                  const SizedBox(width: 6),
-                  Text('${all.length} offres · $unread nouvelles'),
-                  const Spacer(),
-                  if (snapshot.connectionState == ConnectionState.waiting)
-                    const SizedBox(
-                        width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-                ],
-              ),
+              Row(children: [
+                const Icon(Symbols.radar, size: 16),
+                const SizedBox(width: 6),
+                Text('${offers.length}/${all.length} offres · $unread nouvelles · tri : $_sortLabel'),
+                const Spacer(),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const SizedBox(
+                      width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+              ]),
               const BackendActivityBar(fallbackLabel: 'Récupération / analyse des offres…'),
             ],
           ),
@@ -151,9 +195,9 @@ class _OffersScreenState extends State<OffersScreen> {
           children: [
             const Icon(Symbols.search_off, size: 48),
             const SizedBox(height: 12),
-            const Text('Aucune offre pour le moment.'),
+            const Text('Aucune offre à afficher.'),
             const SizedBox(height: 4),
-            Text('Lancez une recherche pour commencer.',
+            Text('Lance une recherche ou ajuste les filtres.',
                 style: Theme.of(context).textTheme.bodySmall),
           ],
         ),

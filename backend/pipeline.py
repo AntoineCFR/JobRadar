@@ -18,7 +18,7 @@ from config import SCRAPE_MIN_DELAY, SCRAPE_MAX_DELAY, SCRAPE_MAX_PAGES
 from scraper import jobs_cz
 from scraper.graphql_client import _session
 from extraction.schema import base_record_from_graphql
-from extraction.agents import process_offer
+from extraction.agents import process_offer, score_relevance
 
 log = logging.getLogger("jobradar.pipeline")
 
@@ -61,6 +61,9 @@ def run_scrape(
             rec["scraped_at"] = dt.datetime.utcnow().isoformat() + "Z"
             if enrich:
                 rec = process_offer(rec)
+                rel = score_relevance(keyword, rec.get("title", ""), rec.get("summary", ""))
+                if rel:
+                    rec["relevance"] = rel
             rec["is_new"] = True
             if persist:
                 firestore_store.upsert_offer(rec, {"keyword": keyword, "location": location})
@@ -144,6 +147,11 @@ def reprocess_all(force: bool = True, progress: Optional[Callable] = None) -> di
                     rec["id"] = offer_id
                     refetched += 1
             rec = process_offer(rec)
+            searches = offer.get("searches") or []
+            kw = str(searches[0]).split("|")[0] if searches else ""
+            rel = score_relevance(kw, rec.get("title", ""), rec.get("summary", ""))
+            if rel:
+                rec["relevance"] = rel
             firestore_store.upsert_offer(rec)
             reprocessed += 1
         except Exception as e:  # noqa: BLE001

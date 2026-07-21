@@ -4,16 +4,12 @@ import 'package:provider/provider.dart';
 
 import '../services/auth_service.dart';
 
-/// Drawer latéral : options et actions globales.
+/// Drawer latéral : actions globales.
 class OptionsDrawer extends StatelessWidget {
   final VoidCallback onNewSearch;
   final VoidCallback onMarkAllRead;
   final VoidCallback onOpenProfile;
   final VoidCallback onScanNew;
-  final bool unreadOnly;
-  final ValueChanged<bool> onUnreadOnlyChanged;
-  final bool sortByRelevance;
-  final ValueChanged<bool> onSortChanged;
 
   const OptionsDrawer({
     super.key,
@@ -21,10 +17,6 @@ class OptionsDrawer extends StatelessWidget {
     required this.onMarkAllRead,
     required this.onOpenProfile,
     required this.onScanNew,
-    required this.unreadOnly,
-    required this.onUnreadOnlyChanged,
-    required this.sortByRelevance,
-    required this.onSortChanged,
   });
 
   @override
@@ -71,18 +63,6 @@ class OptionsDrawer extends StatelessWidget {
               },
             ),
             const Divider(height: 1),
-            SwitchListTile(
-              secondary: const Icon(Symbols.sort),
-              title: const Text('Trier par pertinence'),
-              value: sortByRelevance,
-              onChanged: onSortChanged,
-            ),
-            SwitchListTile(
-              secondary: const Icon(Symbols.mark_email_unread),
-              title: const Text('Nouveautés seulement'),
-              value: unreadOnly,
-              onChanged: onUnreadOnlyChanged,
-            ),
             ListTile(
               leading: const Icon(Symbols.done_all),
               title: const Text('Tout marquer comme lu'),

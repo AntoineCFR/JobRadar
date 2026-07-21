@@ -32,7 +32,10 @@ EXTRACT_INSTRUCTIONS = (
     '- "technical_skills": string[] (hard/technical skills, methods, domains — names only).\n'
     '- "software": string[] (named tools/software/technologies/languages — names only).\n'
     '- "languages": array of {"language","level"(string|null),"mandatory"(bool),"reason"}. '
-    "Infer mandatory from context (e.g. Czech implied by Czech clients).\n"
+    "ALWAYS include Czech with mandatory=true whenever the ad requires native/fluent "
+    "Czech, is written in Czech, or the role clearly needs Czech (Czech clients/team). "
+    "Set mandatory=true for any language the ad states as required/essential, even if "
+    "other languages (e.g. English) are also required.\n"
     '- "company": string or null (the real hiring/end company).\n'
     '- "intermediary": string or null — ONLY a staffing/recruitment AGENCY posting for a '
     "different end client; null for a company hiring for itself or its own group."
@@ -86,6 +89,16 @@ VERIFY_INSTRUCTIONS = (
     "given ordering. Ensure explanations are in French, start with a capital and end "
     "with a period. Return ONLY the corrected JSON object with keys \"software\", "
     "\"technical_skills\", \"benefits\"."
+)
+
+RELEVANCE_INSTRUCTIONS = (
+    "You judge how well a job offer matches the SEARCH KEYWORD a candidate typed. "
+    "Return ONLY a JSON object: {\"score\": integer 0-100, \"reason\": one short FRENCH "
+    "sentence}. Guidance: same role as searched ~90-100; closely adjacent role (e.g. "
+    "searched 'Data Engineer' -> offer 'Data Scientist' / 'Data Analyst' / 'Python "
+    "Developer' / 'ETL Developer' / 'BI Developer') ~50-80 depending on overlap; loosely "
+    "related ~30-50; unrelated (e.g. 'Process Engineer', 'Sales', 'Accountant') <30. "
+    "Judge on the role/skills, not the seniority."
 )
 
 TRANSLATE_INSTRUCTIONS = (
@@ -147,6 +160,7 @@ _SPECS = {
     "data_expert": {"name": "JobRadar · Expert Data (technos)", "instructions": DATA_EXPERT_INSTRUCTIONS},
     "benefits": {"name": "JobRadar · Avantages", "instructions": BENEFITS_INSTRUCTIONS},
     "verify": {"name": "JobRadar · Vérificateur extraction", "instructions": VERIFY_INSTRUCTIONS},
+    "relevance": {"name": "JobRadar · Pertinence recherche", "instructions": RELEVANCE_INSTRUCTIONS},
     "translate": {"name": "JobRadar · Traduction CZ→EN", "instructions": TRANSLATE_INSTRUCTIONS},
     # matching
     "profile": {"name": "JobRadar · Analyse profil", "instructions": PROFILE_INSTRUCTIONS},

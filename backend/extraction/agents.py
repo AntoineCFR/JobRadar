@@ -175,6 +175,24 @@ def translate_to_english(title: str, text: str) -> Optional[dict]:
     }
 
 
+def score_relevance(keyword: str, title: str, summary: str) -> Optional[dict]:
+    """Pertinence de l'offre vs le mot-clé recherché (premier rideau)."""
+    if not keyword:
+        return None
+    out = _ask_agent(
+        "relevance",
+        f"SEARCH KEYWORD: {keyword}\n\nOFFER TITLE: {title}\nOFFER SUMMARY: {summary}",
+        max_chars=3000,
+    )
+    if not out:
+        return None
+    return {
+        "score": _int_0_100(out.get("score")) or 0,
+        "reason": str(out.get("reason", "") or ""),
+        "keyword": keyword,
+    }
+
+
 def process_offer(rec: dict) -> dict:
     """Enrichit un enregistrement d'offre via la chaîne d'agents.
 

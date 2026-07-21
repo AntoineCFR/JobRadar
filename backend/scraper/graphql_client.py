@@ -12,6 +12,7 @@ Tout est en HTTP simple : aucun navigateur headless requis.
 from __future__ import annotations
 
 import re
+import json
 import logging
 from typing import Optional
 from urllib.parse import urlparse
@@ -64,11 +65,39 @@ def get_widget_credentials(
         return None
     m = _WIDGET_RE.search(js) or _WIDGET_ANY_RE.search(js)
     if not m:
-        log.warning("no widget credentials found in script.min.js for %s", host)
+        log.info("no widget creds in script.min.js for %s (essai page inline)", host)
         return None
     creds = (m.group(1), m.group(2))
     _widget_cache[host] = creds
     return creds
+
+
+# Widget v3 : config inline dans la page -> window.__LMC_CAREER_WIDGET__.push({...}).
+_INLINE_WIDGET_RE = re.compile(r'__LMC_CAREER_WIDGET__\.push\((\{.*?\})\)')
+
+
+def get_widget_credentials_from_page(
+    page_url: str, host: str, sess: Optional[requests.Session] = None
+) -> Optional[tuple[str, str]]:
+    """Fallback : extrait widgetId + apiKey du HTML de la page détail (widget v3)."""
+    sess = sess or _session()
+    try:
+        html = sess.get(page_url, timeout=25).text
+    except requests.RequestException as e:
+        log.warning("page fetch failed for creds (%s): %s", page_url, e)
+        return None
+    m = _INLINE_WIDGET_RE.search(html)
+    if not m:
+        return None
+    try:
+        cfg = json.loads(m.group(1))
+        wid, key = cfg.get("widgetId"), cfg.get("apiKey")
+        if wid and key:
+            _widget_cache[host] = (wid, key)
+            return (wid, key)
+    except (ValueError, KeyError):
+        pass
+    return None
 
 
 def fetch_job_ad(
@@ -83,7 +112,10 @@ def fetch_job_ad(
     if not host:
         return None
     creds = get_widget_credentials(host, sess)
+    if not creds:  # widget v3 : identifiants inline dans la page détail
+        creds = get_widget_credentials_from_page(rpd_url, host, sess)
     if not creds:
+        log.warning("aucun identifiant widget pour %s (%s)", job_id, host)
         return None
     widget_id, api_key = creds
 

@@ -56,6 +56,14 @@ Render, générer les artefacts de build. → voir **« Ta liste de courses »**
    scrape, la bascule 🇨🇿/🇬🇧 sur une offre tchèque, la notif quotidienne.
 
 ## Notes de version
+### v0.6.0 (2026-07-21) — pertinence, filtres, tri, correctifs
+- **Agent de pertinence** (premier rideau) : score offre vs mot-clé recherché → affiché sur la tuile (jauge « Pertinence », sous les icônes, au-dessus de « Match »).
+- **Filtres** (dialogue) : pertinence min., compatibilité min., mode de travail, junior only, masquer si tchèque impératif, nouveautés. Badge de compte sur l'icône.
+- **Tri** par menu : pertinence / compatibilité / date.
+- **Tchèque impératif** : le drapeau 🇨🇿 encadré rouge prime désormais sur les autres langues (critère bloquant) ; prompt d'extraction renforcé.
+- **Info-bulles noires au clic** sur les icônes des tuiles.
+- **Offres vides corrigées** : support du widget capybara v3 (identifiants inline `__LMC_CAREER_WIDGET__` dans la page) → sites type Bühler désormais récupérés.
+
 ### v0.5.3 (2026-07-21) — vraie jauge de progression X / Y
 - Le backend expose l'avancement en direct (`/status.progress` = {done, total, phase}) pendant scrape / extraction / ré-analyse / matching.
 - La barre en bas des pages Offres et Profil devient une **vraie jauge « X / Y »** (déterminée), avec le libellé de la phase en cours ; repli indéterminé si le total n'est pas connu.

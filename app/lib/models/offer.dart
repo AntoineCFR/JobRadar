@@ -169,6 +169,8 @@ class Offer {
   final String descriptionText;
   final Translation? translated;
   final MatchResult? match;
+  final int? relevanceScore; // pertinence de l'offre vs le mot-clé recherché
+  final String relevanceReason;
   final bool isRead;
   final Timestamp? firstSeenAt;
 
@@ -202,6 +204,8 @@ class Offer {
     required this.descriptionText,
     required this.translated,
     required this.match,
+    required this.relevanceScore,
+    required this.relevanceReason,
     required this.isRead,
     required this.firstSeenAt,
   });
@@ -209,6 +213,15 @@ class Offer {
   bool get hasTranslation => translated != null;
   bool get isCzech => sourceLanguage == 'cs';
   String get displayTitle => hasTranslation ? translated!.title : title;
+
+  /// L'offre exige-t-elle une langue tchèque impérative (critère bloquant) ?
+  bool get requiresMandatoryCzech => languages.any((l) {
+        final s = l.language.toLowerCase();
+        final cz = s.contains('tch') || s.contains('cze') || s.contains('czech') || s.contains('češ') || s == 'cs';
+        return l.mandatory && cz;
+      });
+
+  bool get isJunior => experienceYears != null && experienceYears! <= 1;
 
   String get locationLabel {
     final parts = <String>[];
@@ -261,6 +274,11 @@ class Offer {
           ? Translation.fromMap(Map<String, dynamic>.from(d['translated']))
           : null,
       match: MatchResult.from(d['match']),
+      relevanceScore: (d['relevance'] is Map && d['relevance']['score'] is int)
+          ? d['relevance']['score'] as int
+          : null,
+      relevanceReason:
+          (d['relevance'] is Map) ? (d['relevance']['reason'] ?? '').toString() : '',
       isRead: d['is_read'] == true,
       firstSeenAt: d['first_seen_at'] is Timestamp ? d['first_seen_at'] as Timestamp : null,
     );
