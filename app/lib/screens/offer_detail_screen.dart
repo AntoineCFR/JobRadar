@@ -100,17 +100,13 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           // 4) Langues
           if (o.languages.isNotEmpty) _languages(context),
 
-          // 5) Logiciels et technos
-          if (o.software.isNotEmpty) ...[
-            _sectionTitle(context, Symbols.terminal, 'Logiciels & technos'),
-            ExplainedList(items: o.software),
-          ],
+          // 5) Logiciels et technos (groupés par domaine)
+          if (o.software.isNotEmpty)
+            _skillSection(context, Symbols.terminal, 'Logiciels & technos', o.software),
 
-          // 6) Compétences techniques
-          if (o.technicalSkills.isNotEmpty) ...[
-            _sectionTitle(context, Symbols.construction, 'Compétences techniques'),
-            ExplainedList(items: o.technicalSkills),
-          ],
+          // 6) Compétences techniques (groupées par domaine)
+          if (o.technicalSkills.isNotEmpty)
+            _skillSection(context, Symbols.construction, 'Compétences techniques', o.technicalSkills),
 
           // 7) Compétences humaines
           if (o.softSkills.isNotEmpty) ...[
@@ -184,6 +180,27 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
     );
   }
 
+  Widget _skillSection(BuildContext context, IconData icon, String title, List<SkillItem> items) {
+    final groups = <String, List<SkillItem>>{};
+    for (final it in items) {
+      (groups[it.domain] ??= []).add(it);
+    }
+    final scheme = Theme.of(context).colorScheme;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionTitle(context, icon, title),
+      for (final entry in groups.entries) ...[
+        if (entry.key.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 8),
+            child: Text(entry.key.toUpperCase(),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.primary, fontWeight: FontWeight.w700, letterSpacing: 0.6)),
+          ),
+        ExplainedList(items: entry.value),
+      ],
+    ]);
+  }
+
   Widget _languages(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -201,7 +218,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
                   Text(
                     '${l.language}${l.level != null && l.level!.isNotEmpty ? ' — ${l.level}' : ''}'
                     '${l.mandatory ? '  (impérative)' : ''}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14.5),
                   ),
                   if (l.reason.isNotEmpty)
                     Text(l.reason,

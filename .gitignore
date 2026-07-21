@@ -7,6 +7,9 @@
 app/android/app/google-services.json
 app/ios/Runner/GoogleService-Info.plist
 
+# dart-defines réels (contiennent le secret API) — garder l'exemple seulement
+app/dart_defines.json
+
 # Python
 **/venv/
 **/__pycache__/

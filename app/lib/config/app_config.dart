@@ -4,10 +4,11 @@
 ///   flutter run --dart-define=JOBRADAR_API=https://jobradar-api.onrender.com \
 ///               --dart-define=JOBRADAR_KEY=xxxxx
 class AppConfig {
-  /// URL du backend Flask (Render). Réglable via --dart-define.
+  /// URL du backend Flask (Render). Non secrète -> valeur par défaut intégrée
+  /// (surchargeable via --dart-define=JOBRADAR_API=...).
   static const String apiBaseUrl = String.fromEnvironment(
     'JOBRADAR_API',
-    defaultValue: 'http://10.0.2.2:8000', // émulateur Android -> localhost
+    defaultValue: 'https://jobradar-tlqj.onrender.com',
   );
 
   /// Secret partagé exigé par POST /scrape (X-JobRadar-Key).

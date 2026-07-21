@@ -1,11 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Un item de compétence/logiciel : nom + explication + niveau éventuel.
+/// Un item de compétence/logiciel : nom + domaine + niveau + poids + explication.
 class SkillItem {
   final String name;
   final String explanation;
-  final String? level;
-  SkillItem({required this.name, this.explanation = '', this.level});
+  final String? level; // Maîtrise / Pratique / Connaissance / Culture générale
+  final String domain; // sous-domaine data/IT (ETL/ELT, CI/CD, ...)
+  final int? weight; // 0-100, remplit la barre de progression
+
+  SkillItem({
+    required this.name,
+    this.explanation = '',
+    this.level,
+    this.domain = '',
+    this.weight,
+  });
 
   /// Tolérant : accepte une String (ancien format) ou un objet {name,...}.
   static SkillItem from(dynamic v) {
@@ -15,6 +24,8 @@ class SkillItem {
         name: (v['name'] ?? '').toString(),
         explanation: (v['explanation'] ?? '').toString(),
         level: v['level']?.toString(),
+        domain: (v['domain'] ?? '').toString(),
+        weight: v['weight'] is int ? v['weight'] as int : int.tryParse('${v['weight']}'),
       );
     }
     return SkillItem(name: v.toString());

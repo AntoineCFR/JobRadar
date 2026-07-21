@@ -56,6 +56,13 @@ Render, générer les artefacts de build. → voir **« Ta liste de courses »**
    scrape, la bascule 🇨🇿/🇬🇧 sur une offre tchèque, la notif quotidienne.
 
 ## Notes de version
+### v0.4.0 (2026-07-21) — technos par domaine + niveaux, tuiles repensées
+- **Technos/logiciels catégorisés par domaine data** (ETL/ELT, CI/CD, Data cleaning…) avec **niveau de maîtrise gradué** (Maîtrise/Pratique/Connaissance/Culture générale) → barre de progression + explication FR sous chaque item.
+- **Avantages extraits du texte** (plus seulement la liste structurée) + détails chiffrés dans l'explication. Format encadré (majuscule, phrase).
+- **Tuiles repensées** : 2 indicateurs à droite (langue principale — 🇨🇿 encadré rouge si tchèque impératif ; « Junior OK » si ≤ 1 an) + jauge de compatibilité (% + barre rouge→verte). Fin des mini-encadrés peu utiles.
+- Typographie allégée (fin du « tout en gras »). `re-traitement complet des offres` possible via `/admin/reprocess-all` (re-fetch du détail des offres vides inclus).
+- **Dev confort** : URL backend par défaut dans l'app + `dart_defines.json` (+ `.vscode/launch.json`) → plus besoin de retaper les `--dart-define`.
+
 ### v0.3.0 (2026-07-21) — multi-agents (extraction + conseil) & refonte fiche
 - **Extraction multi-agents** : `extract → data_expert (ordre par niveau + regroupement logique + explication par item) → benefits (4 catégories) → verify (anti-hallucination) → translate`. Logiciels/compétences/avantages passent en `{nom, explication, niveau}`.
 - **Conseil / matching** : profil candidat (upload PDF → OCR Mistral → structuration), puis par offre un **score de confiance** + synthèse + **points bloquants** + **plan d'attaque** (agents match + calibrage). Recalcul uniquement si match absent ou profil changé.
