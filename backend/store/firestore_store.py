@@ -136,8 +136,10 @@ def get_profile(uid: str) -> dict | None:
 
 
 def set_profile(uid: str, data: dict) -> None:
+    # PAS de merge : un nouveau document de profil REMPLACE entièrement l'ancien
+    # (sinon Firestore fusionne récursivement les maps et garde de vieux sous-champs).
     db = init()
-    db.collection(config.FIRESTORE_PROFILES_COLLECTION).document(uid).set(data, merge=True)
+    db.collection(config.FIRESTORE_PROFILES_COLLECTION).document(uid).set(data)
 
 
 def first_profile() -> tuple[str, dict] | None:

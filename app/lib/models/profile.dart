@@ -4,15 +4,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class Profile {
   final String filename;
   final String version;
+  final String source; // 'ocr' (PDF) | 'text' (.md/.txt)
   final Map<String, dynamic> structured;
   final Timestamp? updatedAt;
 
   Profile({
     required this.filename,
     required this.version,
+    required this.source,
     required this.structured,
     required this.updatedAt,
   });
+
+  bool get isText => source == 'text';
 
   String get headline => (structured['headline'] ?? '').toString();
   String get summary => (structured['summary'] ?? '').toString();
@@ -44,6 +48,7 @@ class Profile {
     return Profile(
       filename: (d['filename'] ?? '').toString(),
       version: (d['version'] ?? '').toString(),
+      source: (d['source'] ?? '').toString(),
       structured: d['structured'] is Map ? Map<String, dynamic>.from(d['structured']) : {},
       updatedAt: d['updated_at'] is Timestamp ? d['updated_at'] as Timestamp : null,
     );

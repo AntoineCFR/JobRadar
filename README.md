@@ -56,6 +56,10 @@ Render, générer les artefacts de build. → voir **« Ta liste de courses »**
    scrape, la bascule 🇨🇿/🇬🇧 sur une offre tchèque, la notif quotidienne.
 
 ## Notes de version
+### v0.6.1 (2026-07-21) — profil : remplacement propre + doc de référence visible
+- **Fix** : un nouveau document de profil **remplace entièrement** le précédent (backend en `set` sans merge ; avant, `merge=True` gardait de vieux sous-champs).
+- **Page Profil** : carte « Document de référence » (nom, type PDF/.md, date d'analyse) + mention explicite « joindre un nouveau document remplace celui-ci ».
+
 ### v0.6.0 (2026-07-21) — pertinence, filtres, tri, correctifs
 - **Agent de pertinence** (premier rideau) : score offre vs mot-clé recherché → affiché sur la tuile (jauge « Pertinence », sous les icônes, au-dessus de « Match »).
 - **Filtres** (dialogue) : pertinence min., compatibilité min., mode de travail, junior only, masquer si tchèque impératif, nouveautés. Badge de compte sur l'icône.

@@ -93,7 +93,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? const SizedBox(
                 width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
             : const Icon(Symbols.upload_file),
-        label: Text(_busy ? 'Analyse…' : 'Joindre (PDF ou .md)'),
+        label: Text(_busy ? 'Analyse…' : 'Joindre / remplacer (PDF ou .md)'),
       ),
       body: uid == null
           ? const Center(child: Text('Non connecté.'))
@@ -132,16 +132,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
       children: [
+        _referenceCard(context, p),
+        const SizedBox(height: 16),
         if (p.headline.isNotEmpty)
           Text(p.headline, style: Theme.of(context).textTheme.titleLarge),
-        Row(children: [
-          const Icon(Symbols.description, size: 15),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(p.filename,
-                style: Theme.of(context).textTheme.bodySmall, overflow: TextOverflow.ellipsis),
-          ),
-        ]),
         if (p.summary.isNotEmpty) ...[
           const SizedBox(height: 14),
           Text(p.summary, style: const TextStyle(height: 1.4)),
@@ -152,6 +146,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _chips(context, Symbols.terminal, 'Logiciels', p.software, null),
         _chips(context, Symbols.translate, 'Langues', p.languages, null),
       ],
+    );
+  }
+
+  Widget _referenceCard(BuildContext context, Profile p) {
+    final scheme = Theme.of(context).colorScheme;
+    final dt = p.updatedAt?.toDate();
+    final dateStr = dt == null
+        ? ''
+        : 'Analysé le ${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} '
+            'à ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return Card(
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(p.isText ? Symbols.article : Symbols.picture_as_pdf, color: scheme.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Document de référence',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: scheme.onSurfaceVariant)),
+                  Text(p.filename.isEmpty ? '(sans nom)' : p.filename,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis),
+                ]),
+              ),
+              Chip(
+                label: Text(p.isText ? '.md / texte' : 'PDF'),
+                visualDensity: VisualDensity.compact,
+              ),
+            ]),
+            if (dateStr.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Row(children: [
+                Icon(Symbols.schedule, size: 14, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text(dateStr, style: Theme.of(context).textTheme.bodySmall),
+              ]),
+            ],
+            const SizedBox(height: 6),
+            Text('Joindre un nouveau document remplace celui-ci.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant, fontStyle: FontStyle.italic)),
+          ],
+        ),
+      ),
     );
   }
 
