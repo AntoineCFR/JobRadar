@@ -116,7 +116,7 @@ class _OffersScreenState extends State<OffersScreen> {
                         width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
                 ],
               ),
-              const BackendActivityBar(label: 'Récupération / analyse des offres en cours…'),
+              const BackendActivityBar(fallbackLabel: 'Récupération / analyse des offres…'),
             ],
           ),
           body: Column(

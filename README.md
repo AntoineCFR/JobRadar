@@ -56,8 +56,12 @@ Render, générer les artefacts de build. → voir **« Ta liste de courses »**
    scrape, la bascule 🇨🇿/🇬🇧 sur une offre tchèque, la notif quotidienne.
 
 ## Notes de version
+### v0.5.3 (2026-07-21) — vraie jauge de progression X / Y
+- Le backend expose l'avancement en direct (`/status.progress` = {done, total, phase}) pendant scrape / extraction / ré-analyse / matching.
+- La barre en bas des pages Offres et Profil devient une **vraie jauge « X / Y »** (déterminée), avec le libellé de la phase en cours ; repli indéterminé si le total n'est pas connu.
+
 ### v0.5.2 (2026-07-21) — barre de progression d'activité
-- **Barre de progression en bas** des pages Offres et Profil quand un traitement tourne côté serveur (scrape / extraction / matching). Interroge `/status` en boucle, ne s'affiche que pendant un run.
+- Barre d'activité en bas des pages Offres et Profil (indéterminée), pilotée par `/status`.
 
 ### v0.5.1 (2026-07-21) — profil : PDF ou .md
 - Le profil accepte désormais **PDF (→ OCR Mistral)** ou **.md/.txt (→ ingestion directe**, plus léger/fiable). Détection par extension côté backend.

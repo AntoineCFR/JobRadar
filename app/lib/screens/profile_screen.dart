@@ -86,7 +86,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onPressed: _reanalyzeAll,
         ),
       ],
-      footer: const BackendActivityBar(label: 'Analyse / matching des offres en cours…'),
+      footer: const BackendActivityBar(fallbackLabel: 'Analyse / matching des offres…'),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _busy ? null : _pickAndUpload,
         icon: _busy

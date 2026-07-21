@@ -70,7 +70,7 @@ def run_scrape(
             errors += 1
             log.warning("offre %s en échec: %s", card.id, e)
         if progress:
-            progress({"idx": idx, "of": len(new_cards), "id": card.id})
+            progress(idx, len(new_cards), f"Analyse des offres · {keyword}")
         if idx < len(new_cards):
             time.sleep(random.uniform(SCRAPE_MIN_DELAY, SCRAPE_MAX_DELAY))
 
@@ -106,7 +106,7 @@ def run_scrape(
     return summary
 
 
-def reprocess_all(force: bool = True) -> dict:
+def reprocess_all(force: bool = True, progress: Optional[Callable] = None) -> dict:
     """Re-passe toutes les offres dans la chaîne d'extraction (nouvelles consignes).
 
     Pour une offre sans texte (détail jamais récupéré), on RETENTE la récupération
@@ -120,9 +120,12 @@ def reprocess_all(force: bool = True) -> dict:
     from scraper.jobs_cz import ListingCard
 
     sess = _session()
-    total = reprocessed = refetched = errors = 0
-    for offer_id, offer in firestore_store.stream_offers():
-        total += 1
+    offers = firestore_store.stream_offers()
+    total = len(offers)
+    reprocessed = refetched = errors = 0
+    for i, (offer_id, offer) in enumerate(offers, 1):
+        if progress:
+            progress(i, total, "Ré-analyse des offres")
         if not force and offer.get("extraction_version") == EXTRACTION_VERSION:
             continue
         try:
@@ -156,7 +159,7 @@ def reprocess_all(force: bool = True) -> dict:
     return summary
 
 
-def run_matching(force: bool = False) -> int:
+def run_matching(force: bool = False, progress: Optional[Callable] = None) -> int:
     """Calcule le matching des offres en attente pour le profil courant.
 
     Ne (re)calcule une offre que si `match` absent, ou si la version du profil
@@ -174,8 +177,12 @@ def run_matching(force: bool = False) -> int:
     pv = profile.get("version", "")
     pstruct = profile.get("structured") or {}
 
+    offers = firestore_store.stream_offers()
+    total = len(offers)
     matched = 0
-    for offer_id, offer in firestore_store.stream_offers():
+    for i, (offer_id, offer) in enumerate(offers, 1):
+        if progress:
+            progress(i, total, "Matching des offres")
         m = offer.get("match")
         up_to_date = (
             m

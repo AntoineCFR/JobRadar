@@ -24,8 +24,18 @@ log = logging.getLogger("jobradar.api")
 app = Flask(__name__)
 
 # État minimal du dernier/du run courant (mémoire process).
-_state: dict = {"running": False, "last": None}
+_state: dict = {"running": False, "last": None, "progress": None}
 _lock = threading.Lock()
+
+
+def _progress_cb(done: int, total: int, phase: str = "") -> None:
+    with _lock:
+        _state["progress"] = {"done": done, "total": total, "phase": phase}
+
+
+def _clear_progress() -> None:
+    with _lock:
+        _state["progress"] = None
 
 
 def _authorized(req) -> bool:
@@ -38,7 +48,7 @@ def _run_async(keyword: str, location: str, max_pages: int):
     with _lock:
         _state["running"] = True
     try:
-        summary = pipeline.run_scrape(keyword, location, max_pages=max_pages)
+        summary = pipeline.run_scrape(keyword, location, max_pages=max_pages, progress=_progress_cb)
         with _lock:
             _state["last"] = summary
     except Exception as e:  # noqa: BLE001
@@ -46,6 +56,7 @@ def _run_async(keyword: str, location: str, max_pages: int):
         with _lock:
             _state["last"] = {"error": str(e)}
     finally:
+        _clear_progress()
         with _lock:
             _state["running"] = False
 
@@ -80,7 +91,7 @@ def scrape():
 
 @app.get("/status")
 def status():
-    return jsonify(running=_state["running"], last=_state["last"])
+    return jsonify(running=_state["running"], last=_state["last"], progress=_state["progress"])
 
 
 @app.get("/count")
@@ -118,10 +129,16 @@ def profile_analyze():
 
     # Re-match de fond (le profil a changé).
     def _rematch():
+        with _lock:
+            _state["running"] = True
         try:
-            pipeline.run_matching(force=True)
+            pipeline.run_matching(force=True, progress=_progress_cb)
         except Exception:  # noqa: BLE001
             log.exception("re-match after profile failed")
+        finally:
+            _clear_progress()
+            with _lock:
+                _state["running"] = False
 
     threading.Thread(target=_rematch, daemon=True).start()
     return jsonify(status="ok", version=doc["version"], structured=doc["structured"]), 200
@@ -146,7 +163,7 @@ def run_searches():
             runs = []
             for s in searches:
                 if s.get("keyword"):
-                    runs.append(pipeline.run_scrape(s["keyword"], s.get("location", "")))
+                    runs.append(pipeline.run_scrape(s["keyword"], s.get("location", ""), progress=_progress_cb))
             with _lock:
                 _state["last"] = {"searches": len(searches), "runs": runs}
         except Exception as e:  # noqa: BLE001
@@ -154,6 +171,7 @@ def run_searches():
             with _lock:
                 _state["last"] = {"error": str(e)}
         finally:
+            _clear_progress()
             with _lock:
                 _state["running"] = False
 
@@ -169,10 +187,16 @@ def match():
     force = bool((request.get_json(silent=True) or {}).get("force"))
 
     def _run():
+        with _lock:
+            _state["running"] = True
         try:
-            pipeline.run_matching(force=force)
+            pipeline.run_matching(force=force, progress=_progress_cb)
         except Exception:  # noqa: BLE001
             log.exception("match run failed")
+        finally:
+            _clear_progress()
+            with _lock:
+                _state["running"] = False
 
     threading.Thread(target=_run, daemon=True).start()
     return jsonify(status="started"), 202
@@ -190,7 +214,7 @@ def admin_reprocess_all():
 
     def _run():
         try:
-            summary = pipeline.reprocess_all(force=True)
+            summary = pipeline.reprocess_all(force=True, progress=_progress_cb)
             with _lock:
                 _state["last"] = summary
         except Exception as e:  # noqa: BLE001
@@ -198,6 +222,7 @@ def admin_reprocess_all():
             with _lock:
                 _state["last"] = {"error": str(e)}
         finally:
+            _clear_progress()
             with _lock:
                 _state["running"] = False
 
