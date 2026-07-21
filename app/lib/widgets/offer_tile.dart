@@ -44,11 +44,13 @@ class OfferTile extends StatelessWidget {
   }
 
   String? get _publishedLabel {
-    final iso = offer.publishedAt;
-    if (iso == null || iso.isEmpty) return null;
-    final d = DateTime.tryParse(iso);
-    if (d == null) return null;
-    return 'Publiée le ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    String fmt(DateTime d) =>
+        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    final pub = offer.publishedDate;
+    if (pub != null) return 'Publiée le ${fmt(pub)}';
+    final seen = offer.seenDate;
+    if (seen != null) return 'Vue le ${fmt(seen)}'; // date de publication non exposée par jobs.cz
+    return null;
   }
 
   /// Info-bulle noire discrète, déclenchée au clic (mobile-friendly).

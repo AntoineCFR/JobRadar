@@ -223,6 +223,15 @@ class Offer {
 
   bool get isJunior => experienceYears != null && experienceYears! <= 1;
 
+  DateTime? get publishedDate =>
+      (publishedAt != null && publishedAt!.isNotEmpty) ? DateTime.tryParse(publishedAt!) : null;
+
+  /// Date de détection par nous (fallback quand la publication est inconnue).
+  DateTime? get seenDate => firstSeenAt?.toDate();
+
+  /// Date effective pour le tri (publication si connue, sinon détection).
+  DateTime? get effectiveDate => publishedDate ?? seenDate;
+
   String get locationLabel {
     final parts = <String>[];
     if (locationCity.isNotEmpty) parts.add(locationCity);

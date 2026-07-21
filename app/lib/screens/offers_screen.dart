@@ -91,7 +91,10 @@ class _OffersScreenState extends State<OffersScreen> {
         list.sort((a, b) => (b.match?.score ?? -1).compareTo(a.match?.score ?? -1));
         break;
       case SortMode.date:
-        break; // déjà trié par date de détection (flux Firestore)
+        final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+        list.sort((a, b) =>
+            (b.effectiveDate ?? epoch).compareTo(a.effectiveDate ?? epoch));
+        break;
     }
     return list;
   }
