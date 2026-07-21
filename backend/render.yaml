@@ -1,0 +1,38 @@
+# Déploiement Render : 1 web service (API + trigger) + 1 cron quotidien.
+# Les secrets (MISTRAL_API_KEY, FIREBASE_CREDENTIALS_JSON, API_SHARED_SECRET)
+# se règlent dans le dashboard Render (sync: false).
+services:
+  - type: web
+    name: jobradar-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 1 --threads 4 --timeout 600 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: MISTRAL_MODEL
+        value: mistral-small-latest
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: FIREBASE_CREDENTIALS_JSON
+        sync: false
+      - key: API_SHARED_SECRET
+        sync: false
+
+  - type: cron
+    name: jobradar-daily
+    runtime: python
+    plan: free
+    rootDir: backend
+    schedule: "0 5 * * *" # 05:00 UTC (~07:00 Prague en été)
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/run_daily.py
+    envVars:
+      - key: MISTRAL_MODEL
+        value: mistral-small-latest
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: FIREBASE_CREDENTIALS_JSON
+        sync: false
+    # Les recherches surveillées viennent de la collection Firestore `searches`
+    # (pas d'env var) — gérables depuis l'app / la console Firebase.

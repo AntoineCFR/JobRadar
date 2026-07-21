@@ -1,0 +1,40 @@
+name: jobradar
+description: "JobRadar — portail de veille d'offres d'emploi (Jobs.cz)."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Firebase
+  firebase_core: ^4.12.1
+  firebase_auth: ^6.5.6
+  cloud_firestore: ^6.7.1
+  firebase_messaging: ^16.0.1
+  google_sign_in: ^7.2.0
+
+  # State / nav
+  provider: ^6.1.5+1
+  go_router: ^17.3.0
+
+  # UI
+  material_symbols_icons: ^4.2951.0
+
+  # Utils
+  http: ^1.5.0
+  intl: ^0.20.2
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.5.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

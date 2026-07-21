@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // App perso : lecture/écriture réservées aux comptes autorisés.
+    // Remplacez la liste par votre (vos) UID Firebase, OU laissez `true` dans
+    // isAllowed() pour autoriser tout utilisateur connecté.
+    function isAllowed() {
+      return request.auth != null;
+      // Variante verrouillée à un compte précis :
+      // return request.auth != null && request.auth.uid in ['VOTRE_UID'];
+    }
+
+    // Les offres sont écrites par le backend (Admin SDK, qui bypasse ces règles).
+    // Depuis l'app : lecture, et écriture limitée au champ `is_read`.
+    match /offers/{offerId} {
+      allow read: if isAllowed();
+      allow update: if isAllowed()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_read']);
+      allow create, delete: if false; // réservé au backend
+    }
+
+    match /scrape_runs/{runId} {
+      allow read: if isAllowed();
+      allow write: if false; // réservé au backend
+    }
+
+    // Recherches surveillées par le cron : gérées depuis l'app (phase 2).
+    match /searches/{searchId} {
+      allow read, write: if isAllowed();
+    }
+  }
+}
