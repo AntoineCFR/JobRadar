@@ -20,7 +20,7 @@ from extraction.agents_setup import ensure_agents, _SPECS
 
 log = logging.getLogger("jobradar.agents")
 
-EXTRACTION_VERSION = 3  # incrémenter pour forcer un re-traitement des offres
+EXTRACTION_VERSION = 4  # incrémenter pour forcer un re-traitement des offres
 
 _client = None
 _agents_disabled = False

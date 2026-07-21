@@ -51,12 +51,14 @@ DATA_EXPERT_INSTRUCTIONS = (
     '"Langages", "ETL/ELT", "Data cleaning", "Bases de données", "Cloud & plateformes", '
     '"Orchestration", "CI/CD", "Big Data", "BI & visualisation", "Machine Learning", '
     '"Méthodologie" (you may use another if clearly better),\n'
-    '   "level": one of "Maîtrise", "Pratique", "Connaissance", "Culture générale" — '
-    "inferred from how the ad phrases it (proficient/expert -> Maîtrise; have worked "
-    "with / experience with -> Pratique; knowledge of -> Connaissance; aware of / "
-    "familiar with -> Culture générale; if unspecified, infer from context),\n"
-    '   "weight": integer 0-100 for that level (Maîtrise~90, Pratique~65, '
-    "Connaissance~40, Culture générale~20; nuance within),\n"
+    '   "level": the REQUIRED proficiency, one of "Maîtrise", "Pratique habituelle", '
+    '"Déjà pratiqué", "Notion" — inferred from the ad wording: strong/expert/advanced/'
+    "deep -> \"Maîtrise\"; solid experience / proficient / experience with -> \"Pratique "
+    "habituelle\"; some experience / working / hands-on -> \"Déjà pratiqué\"; familiarity "
+    "with / knowledge of / awareness / nice to have / e.g. -> \"Notion\". If unspecified, "
+    "default to \"Déjà pratiqué\".\n"
+    '   "weight": integer 0-100 (Maîtrise~90, "Pratique habituelle"~70, '
+    '"Déjà pratiqué"~45, Notion~20),\n'
     '   "explanation": ONE FRENCH sentence, starting with a capital letter and ending '
     "with a period, saying what it is and the expected mastery for this role.}\n"
     "ORDER each array so items are GROUPED BY DOMAIN (contiguous), most important domain "
@@ -144,12 +146,19 @@ PROFILE_SKILLS_INSTRUCTIONS = (
     '  {"name": proper-cased string, "domain": FRENCH data/IT sub-domain (Langages, '
     'ETL/ELT, Data cleaning, Bases de données, Cloud & plateformes, Orchestration, '
     'CI/CD, Big Data, BI & visualisation, Machine Learning, Méthodologie), '
-    '"level": "Maîtrise" | "Pratique" | "Connaissance" | "Culture générale" (infer from '
-    "how the candidate describes their mastery / usage / stage of learning; someone "
-    "still learning a tool = Connaissance, used it in projects = Pratique, expert/years "
-    'of use = Maîtrise), "explanation": one short FRENCH sentence on the candidate\'s '
-    "actual experience with it.} Only include items evidenced in the document; never "
-    "invent. Order by domain then decreasing level."
+    '"level": one of "Maîtrise", "Pratique habituelle", "Déjà pratiqué", "Notion", '
+    "assigned CONSERVATIVELY from EVIDENCE of depth AND duration: \"Maîtrise\" ONLY for "
+    "skills used PROFESSIONALLY, ~daily, for 6-12+ months (usually the candidate's "
+    "long-standing PRIOR expertise, e.g. project management or their former trade); "
+    "\"Pratique habituelle\" for regular ongoing hands-on use over months; \"Déjà "
+    "pratiqué\" for hands-on but limited (courses + some project use — e.g. Git, VS Code, "
+    "a language learnt recently); \"Notion\" for theoretical/familiar only. A self-taught "
+    "career-changer's NEW (e.g. data) skills are typically \"Déjà pratiqué\" or "
+    "\"Notion\" — do NOT inflate them to \"Maîtrise\". "
+    '"weight": integer 0-100 (Maîtrise~90, "Pratique habituelle"~70, "Déjà pratiqué"~45, '
+    'Notion~20), "explanation": one short FRENCH sentence on the candidate\'s actual '
+    "experience with it.} Only include items evidenced in the document; never invent. "
+    "Order by domain then decreasing level."
 )
 
 PROFILE_VERIFY_INSTRUCTIONS = (
@@ -180,21 +189,31 @@ MATCH_INSTRUCTIONS = (
     "Snowflake ≈ Redshift (cloud DWH); GCP ≈ Azure ≈ AWS; Talend ≈ Airflow (orchestration). "
     "Credit the candidate's equivalent skills.\n"
     "5. Languages — two-sided rule: (a) NEVER infer a language need from the "
-    "country/location. (b) BUT if the offer's languages list or text EXPLICITLY requires "
-    "a language at a level the candidate lacks — e.g. Czech at 'Excellent / Advanced / "
-    "C1 / fluent / business / native' while the candidate is Czech A2-B1 — that IS a "
-    "HIGH-severity blocker: flag it AND cap the overall score in the 20-45 range (a hard "
-    "language barrier is largely disqualifying). English C1-C2 satisfies any English "
-    "requirement.\n"
-    "SCORING — spread across the range, be discriminating (do NOT cluster everyone low):\n"
-    "  80-95 strong fit — right role AND direct professional experience in the role's "
-    "core field;\n"
-    "  60-80 good fit — a career-changer with strong TRANSFERABLE skills but little/no "
-    "professional experience in the target field tops out here (still a positive signal);\n"
-    "  40-60 partial fit (relevant but clear gaps, e.g. junior for a mid role);\n"
-    "  20-40 weak fit (transferable relevance only, major gaps);\n"
-    "  0-20 poor fit (wrong role, or an explicit hard requirement clearly unmet).\n"
-    "A single surmountable gap must NOT push the score below 40.\n"
+    "country/location. (b) BUT if the offer EXPLICITLY requires a language at a level "
+    "the candidate lacks — e.g. Czech at 'Excellent / Advanced / C1 / fluent / business "
+    "/ native' while the candidate is Czech A2-B1 — that is NEAR-DISQUALIFYING: flag it "
+    "as a high-severity blocker AND cap the overall score around 10-20, regardless of "
+    "other strengths. English C1-C2 satisfies any English requirement.\n"
+    "SCORING RUBRIC (be realistic and discriminating; transferable skills/sector fit/"
+    "equivalent tools are POSITIVES that lift WITHIN a band and can move partial->good, "
+    "but they do NOT replace missing required professional experience in the field):\n"
+    "  85-100 excellent — meets essentially ALL requirements INCLUDING the required "
+    "professional experience in the field;\n"
+    "  65-85 strong — relevant professional experience in the field + meets most "
+    "requirements, minor gaps;\n"
+    "  50-65 good — meets several requirements but a notable gap (slightly under the "
+    "required years, or a few required skills below the required level);\n"
+    "  30-50 partial — genuine transferable strengths / sector fit, BUT lacks the "
+    "required professional experience in the role's core field and/or several required "
+    "skills at the required level. A career-changer WITHOUT the required field experience "
+    "generally lands here — an honest 'you have a real shot' signal, not a strong fit;\n"
+    "  15-30 weak — only loose/transferable relevance, major gaps;\n"
+    "  <15 very low — wrong role, or a near-disqualifying hard blocker.\n"
+    "WORKED EXAMPLE: a logistics-sector career-changer applies to a Data Engineer role "
+    "requiring 2 years of data experience + strong Python/SQL + cloud. They have strong "
+    "English, sector knowledge, and SOME (mostly non-professional) Python/SQL/cloud, but "
+    "NOT the 2 years and not 'strong' proficiency -> about 45 (partial: real chances, "
+    "clear gaps). Do NOT rate this 80+.\n"
     "JSON keys: \"score\" (int per rubric), \"band\" (faible|moyen|bon|excellent), "
     "\"verdict\" (one FR sentence), \"synthese\" (FR, 3-5 sentences, balanced), "
     '"blockers" (array of {"issue" FR, "severity" haute|moyenne|basse} — ONLY genuine '
@@ -204,29 +223,30 @@ MATCH_INSTRUCTIONS = (
 )
 
 CALIBRATE_INSTRUCTIONS = (
-    "You review a career-advisor assessment (JSON draft) for FAIRNESS and consistency, "
-    "given the candidate profile and the job offer. Your job is to correct "
-    "OVER-penalization and inconsistency (false negatives), NOT to add pessimism. "
-    "Return the SAME JSON structure corrected. Fix these errors:\n"
-    "- REMOVE any blocker referencing something NOT explicitly required in the offer "
-    "(invented tools like Airflow/Luigi, inferred needs).\n"
-    "- REMOVE a language from blockers only if it is NOT explicitly required by the "
-    "offer (never penalize Czech just because the job is in Czechia). BUT if the offer "
-    "EXPLICITLY requires Czech at a high level (Excellent/Advanced/C1/fluent/business/"
-    "native) and the candidate is A2-B1, KEEP it as a HIGH-severity blocker and cap the "
-    "score in the 20-45 range.\n"
-    "- Downgrade soft requirements ('familiarity/knowledge of/e.g./nice to have', "
-    "examples) — not blockers; an equivalent/competing tool satisfies them.\n"
-    "- Ensure transferable/equivalent skills AND the candidate's full experience "
-    "(including non-data roles like project management) are credited in 'matches' and "
-    "reflected in the score.\n"
-    "- Make 'score'/'band' consistent with the REMAINING blockers/matches using the "
-    "rubric (poor <20, weak 20-40, partial 40-60, good 60-80, strong 80-95). A single "
-    "surmountable gap must not crush the score below 40; only a genuinely disqualifying, "
-    "explicit hard requirement caps it low. Correct clustering: good candidates should "
-    "score high.\n"
-    "Return ONLY the corrected JSON (same keys: score, band, verdict, synthese, "
-    "blockers, matches, plan)."
+    "You audit a career-advisor assessment (JSON draft) for FAIRNESS in BOTH directions, "
+    "given the candidate profile and the job offer. Correct false negatives AND false "
+    "positives. Return the SAME JSON structure corrected.\n"
+    "Correct OVER-penalization:\n"
+    "- REMOVE blockers referencing anything NOT explicitly required in the offer "
+    "(invented tools like Airflow/Luigi, needs inferred from location).\n"
+    "- Treat soft requirements ('familiarity / knowledge of / e.g. / nice to have') and "
+    "equivalent/competing tools as satisfied — not blockers.\n"
+    "- Credit the candidate's transferable / sector experience and full background "
+    "(including non-data roles like project management).\n"
+    "Correct OVER-optimism (equally important):\n"
+    "- Do NOT let transferable skills, sector fit or equivalent tools push the score "
+    "high when the candidate LACKS the required PROFESSIONAL experience in the role's "
+    "core field. Such a career-changer belongs in the 30-55 range, NOT 70+.\n"
+    "- KEEP legitimate gaps as blockers: missing required years of experience, required "
+    "skills clearly below the required level, or an explicitly required fluent/business "
+    "language the candidate lacks.\n"
+    "- An explicitly required fluent/business language the candidate lacks (e.g. Czech "
+    "Excellent/C1 vs A2-B1) is NEAR-DISQUALIFYING: cap the score around 10-20 and list "
+    "it as a high-severity blocker.\n"
+    "Make 'score'/'band' consistent with the corrected blockers using the rubric "
+    "(excellent 85-100, strong 65-85, good 50-65, partial 30-50, weak 15-30, "
+    "very low <15). Return ONLY the corrected JSON (same keys: score, band, verdict, "
+    "synthese, blockers, matches, plan)."
 )
 
 _SPECS = {

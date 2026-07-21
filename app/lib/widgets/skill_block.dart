@@ -14,9 +14,9 @@ class SkillBlock extends StatelessWidget {
 
   static Color _levelColor(String? level) => switch (level) {
         'Maîtrise' => Colors.green.shade600,
-        'Pratique' => Colors.blue.shade600,
-        'Connaissance' => Colors.orange.shade700,
-        'Culture générale' => Colors.blueGrey.shade400,
+        'Pratique habituelle' => Colors.blue.shade600,
+        'Déjà pratiqué' => Colors.orange.shade700,
+        'Notion' => Colors.blueGrey.shade400,
         _ => Colors.blue.shade600,
       };
 
@@ -24,11 +24,11 @@ class SkillBlock extends StatelessWidget {
     switch (it.level) {
       case 'Maîtrise':
         return 4;
-      case 'Pratique':
+      case 'Pratique habituelle':
         return 3;
-      case 'Connaissance':
+      case 'Déjà pratiqué':
         return 2;
-      case 'Culture générale':
+      case 'Notion':
         return 1;
     }
     if (it.weight != null) return (it.weight! / 25).ceil().clamp(1, 4);
