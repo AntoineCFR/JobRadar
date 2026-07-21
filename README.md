@@ -56,6 +56,11 @@ Render, générer les artefacts de build. → voir **« Ta liste de courses »**
    scrape, la bascule 🇨🇿/🇬🇧 sur une offre tchèque, la notif quotidienne.
 
 ## Notes de version
+### v0.4.1 (2026-07-21) — actualisation complète + date sur la tuile
+- « Actualiser toutes les offres » (drawer) = **boucle complète** : re-scrape des recherches surveillées → extraction → matching (endpoint `/run-searches`).
+- **Date de publication** affichée sur chaque tuile.
+- Rappel : le scraper parcourt jusqu'à 10 pages (~300 offres) ; les tests précédents étaient limités à 1 page.
+
 ### v0.4.0 (2026-07-21) — technos par domaine + niveaux, tuiles repensées
 - **Technos/logiciels catégorisés par domaine data** (ETL/ELT, CI/CD, Data cleaning…) avec **niveau de maîtrise gradué** (Maîtrise/Pratique/Connaissance/Culture générale) → barre de progression + explication FR sous chaque item.
 - **Avantages extraits du texte** (plus seulement la liste structurée) + détails chiffrés dans l'explication. Format encadré (majuscule, phrase).

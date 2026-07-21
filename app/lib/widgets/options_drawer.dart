@@ -9,7 +9,7 @@ class OptionsDrawer extends StatelessWidget {
   final VoidCallback onNewSearch;
   final VoidCallback onMarkAllRead;
   final VoidCallback onOpenProfile;
-  final VoidCallback onRematch;
+  final VoidCallback onRefreshAll;
   final bool unreadOnly;
   final ValueChanged<bool> onUnreadOnlyChanged;
   final bool sortByRelevance;
@@ -20,7 +20,7 @@ class OptionsDrawer extends StatelessWidget {
     required this.onNewSearch,
     required this.onMarkAllRead,
     required this.onOpenProfile,
-    required this.onRematch,
+    required this.onRefreshAll,
     required this.unreadOnly,
     required this.onUnreadOnlyChanged,
     required this.sortByRelevance,
@@ -62,12 +62,12 @@ class OptionsDrawer extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Symbols.target),
-              title: const Text('Analyser les offres'),
-              subtitle: const Text('(re)calculer les correspondances'),
+              leading: const Icon(Symbols.refresh),
+              title: const Text('Actualiser toutes les offres'),
+              subtitle: const Text('récupération + analyse + matching'),
               onTap: () {
                 Navigator.pop(context);
-                onRematch();
+                onRefreshAll();
               },
             ),
             const Divider(height: 1),

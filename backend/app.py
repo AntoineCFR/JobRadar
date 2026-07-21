@@ -114,6 +114,40 @@ def profile_analyze():
     return jsonify(status="ok", version=doc["version"], structured=doc["structured"]), 200
 
 
+@app.post("/run-searches")
+def run_searches():
+    """Boucle complète : re-scrape toutes les recherches surveillées (collection
+    `searches`) -> extraction -> matching. En tâche de fond."""
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    with _lock:
+        if _state["running"]:
+            return jsonify(status="already_running"), 409
+        _state["running"] = True
+
+    def _run():
+        try:
+            from store import firestore_store
+
+            searches = firestore_store.get_daily_searches()
+            runs = []
+            for s in searches:
+                if s.get("keyword"):
+                    runs.append(pipeline.run_scrape(s["keyword"], s.get("location", "")))
+            with _lock:
+                _state["last"] = {"searches": len(searches), "runs": runs}
+        except Exception as e:  # noqa: BLE001
+            log.exception("run-searches failed")
+            with _lock:
+                _state["last"] = {"error": str(e)}
+        finally:
+            with _lock:
+                _state["running"] = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify(status="started"), 202
+
+
 @app.post("/match")
 def match():
     """Relance le matching des offres en attente (missing/stale) en tâche de fond."""

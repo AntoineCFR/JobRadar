@@ -18,6 +18,14 @@ class OfferTile extends StatelessWidget {
               ? Colors.orange.shade700
               : Colors.red.shade600;
 
+  String? get _publishedLabel {
+    final iso = offer.publishedAt;
+    if (iso == null || iso.isEmpty) return null;
+    final d = DateTime.tryParse(iso);
+    if (d == null) return null;
+    return 'Publiée le ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  }
+
   RequiredLanguage? get _mainLanguage {
     final mand = offer.languages.where((l) => l.mandatory).toList();
     final pool = mand.isNotEmpty ? mand : offer.languages;
@@ -68,6 +76,8 @@ class OfferTile extends StatelessWidget {
                             : offer.company),
                     if (offer.locationLabel.isNotEmpty)
                       _iconLine(context, Symbols.location_on, offer.locationLabel),
+                    if (_publishedLabel != null)
+                      _iconLine(context, Symbols.event, _publishedLabel!),
                   ],
                 ),
               ),
