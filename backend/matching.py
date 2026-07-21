@@ -18,7 +18,7 @@ from extraction.agents import _get_client, _ask_agent
 
 log = logging.getLogger("jobradar.matching")
 
-MATCH_VERSION = 3  # incrémenté à chaque refonte du matching -> force le re-matching
+MATCH_VERSION = 4  # incrémenté à chaque refonte du matching -> force le re-matching
 
 
 # --------------------------------------------------------------------------- #
