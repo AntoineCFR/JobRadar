@@ -83,6 +83,19 @@ def status():
     return jsonify(running=_state["running"], last=_state["last"])
 
 
+@app.get("/count")
+def count():
+    """Nombre d'offres en base (léger : liste les refs, ne lit pas les docs)."""
+    try:
+        from store import firestore_store
+
+        db = firestore_store.init()
+        n = sum(1 for _ in db.collection(config.FIRESTORE_OFFERS_COLLECTION).list_documents())
+        return jsonify(offers=n)
+    except Exception as e:  # noqa: BLE001
+        return jsonify(error=str(e)), 500
+
+
 @app.post("/profile/analyze")
 def profile_analyze():
     """Reçoit un PDF de profil (multipart 'file' + 'uid'), l'OCR + le structure,
