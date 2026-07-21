@@ -56,6 +56,11 @@ Render, générer les artefacts de build. → voir **« Ta liste de courses »**
    scrape, la bascule 🇨🇿/🇬🇧 sur une offre tchèque, la notif quotidienne.
 
 ## Notes de version
+### v0.7.0 (2026-07-21) — profil multi-agents + fix troncature
+- **Fix majeur** : l'agent Profil était tronqué à 20 000 caractères → la section Langues (en fin de CV) était coupée, d'où des niveaux inventés (Anglais B2 au lieu de C1-C2). Lecture portée à 120 000 caractères + niveaux CEFR verbatim.
+- **Profil multi-agents** (comme les offres) : `profile` (base) → `profile_skills` (compétences candidat catégorisées par domaine/niveau) → `profile_verify` (contrôle de fidélité).
+- Page Profil : compétences du candidat affichées dans un **SkillBlock** (mêmes catégories/niveaux que les offres → matching plus fin).
+
 ### v0.6.1 (2026-07-21) — profil : remplacement propre + doc de référence visible
 - **Fix** : un nouveau document de profil **remplace entièrement** le précédent (backend en `set` sans merge ; avant, `merge=True` gardait de vieux sous-champs).
 - **Page Profil** : carte « Document de référence » (nom, type PDF/.md, date d'analyse) + mention explicite « joindre un nouveau document remplace celui-ci ».

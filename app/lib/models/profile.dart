@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'offer.dart' show SkillItem;
+
 /// Profil candidat structuré par l'agent (document Firestore `profiles/{uid}`).
 class Profile {
   final String filename;
@@ -28,8 +30,10 @@ class Profile {
 
   List<String> get strengths => _s('strengths');
   List<String> get gaps => _s('gaps');
-  List<String> get hardSkills => _s('hard_skills');
-  List<String> get software => _s('software');
+
+  // Compétences candidat catégorisées (par la chaîne multi-agents profil).
+  List<SkillItem> get hardSkillItems => SkillItem.list(structured['hard_skills']);
+  List<SkillItem> get softwareItems => SkillItem.list(structured['software']);
 
   List<String> get languages {
     final v = structured['languages'];

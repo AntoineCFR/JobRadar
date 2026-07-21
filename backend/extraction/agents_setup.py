@@ -120,7 +120,7 @@ PROFILE_INSTRUCTIONS = (
     '- "total_experience_years": number or null.\n'
     '- "domains": array of {"domain": string, "years": number|null} (fields the '
     "candidate has real experience in).\n"
-    '- "hard_skills": string[]; "software": string[]; "soft_skills": string[].\n'
+    '- "soft_skills": string[] in French (human/interpersonal skills).\n'
     '- "languages": array of {"language","level"}. Use the level(s) EXACTLY as stated '
     "in the document, verbatim (e.g. document says English C1-C2 -> \"C1-C2\"; Czech "
     "\"A2 solide, proche B1\" -> \"A2-B1\"; French natif -> \"C2 (natif)\"). NEVER "
@@ -129,6 +129,31 @@ PROFILE_INSTRUCTIONS = (
     '- "strengths": string[]; "gaps": string[] (weaknesses vs typical data roles, e.g. '
     "\"no data engineering experience\").\n"
     '- "summary": string (3-4 sentences, neutral)."'
+)
+
+PROFILE_SKILLS_INSTRUCTIONS = (
+    "You are a senior Data / IT expert analysing a CANDIDATE's CV / skills document. "
+    "Extract the technical skills and software/technologies the candidate actually "
+    "masters or is learning. Return ONLY a JSON object with two keys \"hard_skills\" "
+    "and \"software\", each an ARRAY of objects:\n"
+    '  {"name": proper-cased string, "domain": FRENCH data/IT sub-domain (Langages, '
+    'ETL/ELT, Data cleaning, Bases de données, Cloud & plateformes, Orchestration, '
+    'CI/CD, Big Data, BI & visualisation, Machine Learning, Méthodologie), '
+    '"level": "Maîtrise" | "Pratique" | "Connaissance" | "Culture générale" (infer from '
+    "how the candidate describes their mastery / usage / stage of learning; someone "
+    "still learning a tool = Connaissance, used it in projects = Pratique, expert/years "
+    'of use = Maîtrise), "explanation": one short FRENCH sentence on the candidate\'s '
+    "actual experience with it.} Only include items evidenced in the document; never "
+    "invent. Order by domain then decreasing level."
+)
+
+PROFILE_VERIFY_INSTRUCTIONS = (
+    "You verify a structured candidate profile (JSON draft) against the SOURCE document. "
+    "Return the SAME JSON structure, corrected and COMPLETE (keep every field): remove "
+    "any skill / language / experience not supported by the document, fix language "
+    "levels to match the document VERBATIM (e.g. English C1-C2, not B2), ensure "
+    "\"gaps\" are real weaknesses stated or clearly implied. Never invent. Return ONLY "
+    "the corrected JSON object."
 )
 
 MATCH_INSTRUCTIONS = (
@@ -167,6 +192,8 @@ _SPECS = {
     "translate": {"name": "JobRadar · Traduction CZ→EN", "instructions": TRANSLATE_INSTRUCTIONS},
     # matching
     "profile": {"name": "JobRadar · Analyse profil", "instructions": PROFILE_INSTRUCTIONS},
+    "profile_skills": {"name": "JobRadar · Expert Data (profil)", "instructions": PROFILE_SKILLS_INSTRUCTIONS},
+    "profile_verify": {"name": "JobRadar · Vérificateur profil", "instructions": PROFILE_VERIFY_INSTRUCTIONS},
     "match": {"name": "JobRadar · Matching offre/profil", "instructions": MATCH_INSTRUCTIONS},
     "calibrate": {"name": "JobRadar · Calibrage score", "instructions": CALIBRATE_INSTRUCTIONS},
 }

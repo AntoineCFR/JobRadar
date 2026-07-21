@@ -44,12 +44,33 @@ def profile_version(text: str) -> str:
 
 
 def analyze_profile(text: str) -> Optional[dict]:
-    """Structure le texte du CV/profil via l'agent Profil.
+    """Structure un profil via une chaîne multi-agents (comme les offres) :
+      ① profile (base) → ② profile_skills (compétences par domaine/niveau)
+      → ③ profile_verify (contrôle de fidélité).
 
-    Limite haute : un profil complet (souvent > 20k caractères) doit être lu en
-    ENTIER, sinon des sections en fin de document (ex. Langues) sont tronquées.
+    Limite haute (120k) : un profil complet dépasse souvent 20k caractères — il
+    doit être lu en ENTIER (sinon les sections de fin, ex. Langues, sont tronquées).
     """
-    return _ask_agent("profile", f"CANDIDATE DOCUMENT:\n{text}", max_chars=120000)
+    doc = f"CANDIDATE DOCUMENT:\n{text}"
+    base = _ask_agent("profile", doc, max_chars=120000) or {}
+
+    # ② compétences techniques + logiciels du candidat, catégorisés (expert Data).
+    skills = _ask_agent("profile_skills", doc, max_chars=120000) or {}
+    structured = dict(base)
+    if skills.get("hard_skills"):
+        structured["hard_skills"] = skills["hard_skills"]
+    if skills.get("software"):
+        structured["software"] = skills["software"]
+
+    # ③ vérificateur de fidélité (langues verbatim, pas d'invention).
+    verified = _ask_agent(
+        "profile_verify",
+        f"{doc}\n\nDRAFT PROFILE JSON:\n{json.dumps(structured, ensure_ascii=False)}",
+        max_chars=120000,
+    )
+    if isinstance(verified, dict) and verified:
+        structured = {**structured, **verified}
+    return structured
 
 
 _TEXT_EXTS = (".md", ".markdown", ".txt")

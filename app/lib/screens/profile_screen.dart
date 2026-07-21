@@ -9,6 +9,7 @@ import '../services/profile_service.dart';
 import '../services/scrape_service.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/backend_activity_bar.dart';
+import '../widgets/skill_block.dart';
 
 /// Écran « Mon profil » : joindre un PDF de compétences → analysé par l'IA,
 /// puis utilisé pour matcher les offres.
@@ -142,9 +143,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
         _chips(context, Symbols.thumb_up, 'Points forts', p.strengths, Colors.green.shade600),
         _chips(context, Symbols.warning, 'Lacunes', p.gaps, Colors.orange.shade700),
-        _chips(context, Symbols.construction, 'Compétences', p.hardSkills, null),
-        _chips(context, Symbols.terminal, 'Logiciels', p.software, null),
         _chips(context, Symbols.translate, 'Langues', p.languages, null),
+        if (p.hardSkillItems.isNotEmpty || p.softwareItems.isNotEmpty)
+          SkillBlock(software: p.softwareItems, technical: p.hardSkillItems),
       ],
     );
   }
