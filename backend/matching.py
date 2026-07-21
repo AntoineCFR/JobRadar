@@ -108,6 +108,12 @@ def _offer_view(offer: dict) -> dict:
     def names(items):
         return [i.get("name") if isinstance(i, dict) else i for i in (items or [])]
 
+    # Texte de l'offre (tronqué) : indispensable pour distinguer un prérequis dur
+    # d'un « familiarity with » / d'un exemple ("e.g. Snowflake").
+    desc = offer.get("description_text") or ""
+    tr = offer.get("translated") or {}
+    if tr.get("description_text"):
+        desc = tr["description_text"]
     return {
         "title": offer.get("title"),
         "company": offer.get("company"),
@@ -120,6 +126,7 @@ def _offer_view(offer: dict) -> dict:
         "software": names(offer.get("software")),
         "technical_skills": names(offer.get("technical_skills")),
         "summary": offer.get("summary"),
+        "offer_text": desc[:2500],
     }
 
 

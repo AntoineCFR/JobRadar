@@ -264,6 +264,31 @@ def admin_reprocess():
         return jsonify(error=str(e)), 500
 
 
+@app.post("/admin/test-match")
+def admin_test_match():
+    """Debug matching : {profile_text, offer_id} -> analyse profil + match (sans stockage)."""
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    body = request.get_json(silent=True) or {}
+    text = body.get("profile_text", "")
+    offer_id = str(body.get("offer_id") or "")
+    if not text or not offer_id:
+        return jsonify(error="profile_text et offer_id requis"), 400
+    try:
+        from store import firestore_store
+        from matching import analyze_profile, match_offer
+
+        offer = firestore_store.get_offer(offer_id)
+        if not offer:
+            return jsonify(error="offre introuvable"), 404
+        profile = analyze_profile(text)
+        result = match_offer(profile or {}, offer)
+        return jsonify(offer_title=offer.get("title"), match=result)
+    except Exception as e:  # noqa: BLE001
+        log.exception("test-match failed")
+        return jsonify(error=str(e)), 500
+
+
 @app.post("/admin/analyze-profile-text")
 def admin_analyze_profile_text():
     """Debug : structure un texte de profil et renvoie le résultat (sans stockage)."""
