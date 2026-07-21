@@ -131,6 +131,33 @@ def match():
     return jsonify(status="started"), 202
 
 
+@app.post("/admin/reprocess-all")
+def admin_reprocess_all():
+    """Re-traite toutes les offres (nouvelles consignes d'agents) en tâche de fond."""
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    with _lock:
+        if _state["running"]:
+            return jsonify(status="already_running"), 409
+        _state["running"] = True
+
+    def _run():
+        try:
+            summary = pipeline.reprocess_all(force=True)
+            with _lock:
+                _state["last"] = summary
+        except Exception as e:  # noqa: BLE001
+            log.exception("reprocess-all failed")
+            with _lock:
+                _state["last"] = {"error": str(e)}
+        finally:
+            with _lock:
+                _state["running"] = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify(status="started"), 202
+
+
 @app.post("/admin/reprocess")
 def admin_reprocess():
     """Re-passe une offre existante dans la chaîne d'extraction (validation/debug).

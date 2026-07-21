@@ -38,36 +38,52 @@ EXTRACT_INSTRUCTIONS = (
 )
 
 DATA_EXPERT_INSTRUCTIONS = (
-    "You are a senior expert in Data / IT job markets. Given a job ad text and lists "
-    "of technical skills and software/technologies, you rewrite them for a candidate. "
-    "Return ONLY a JSON object with two keys: \"software\" and \"technical_skills\". "
-    "Each is an ARRAY of objects {\"name\": string, \"explanation\": string (one concise "
-    "sentence: what it is / why this role needs it), \"level\": string|null (required "
-    "proficiency if the ad implies one, e.g. \"expert\", \"advanced\", \"notions\")}. "
-    "ORDER each array: first by decreasing required level/importance, then group items "
-    "logically (e.g. languages -> libraries/frameworks -> cloud & data platforms -> "
-    "orchestration/CI -> databases -> BI/visualisation -> methodology). Do not add items "
-    "absent from the input/text; you may merge duplicates and normalise names."
+    "You are a senior expert in Data / IT job markets, advising a FRENCH-speaking "
+    "candidate. Given a job ad text and lists of technical skills and software, produce "
+    "a refined, categorised view. Return ONLY a JSON object with two keys \"software\" "
+    "and \"technical_skills\". Each is an ARRAY of objects:\n"
+    '  {"name": proper-cased string (e.g. "Python", "Power BI", "Kubernetes"),\n'
+    '   "domain": FRENCH data/IT sub-domain — pick the most accurate. Typical: '
+    '"Langages", "ETL/ELT", "Data cleaning", "Bases de données", "Cloud & plateformes", '
+    '"Orchestration", "CI/CD", "Big Data", "BI & visualisation", "Machine Learning", '
+    '"Méthodologie" (you may use another if clearly better),\n'
+    '   "level": one of "Maîtrise", "Pratique", "Connaissance", "Culture générale" — '
+    "inferred from how the ad phrases it (proficient/expert -> Maîtrise; have worked "
+    "with / experience with -> Pratique; knowledge of -> Connaissance; aware of / "
+    "familiar with -> Culture générale; if unspecified, infer from context),\n"
+    '   "weight": integer 0-100 for that level (Maîtrise~90, Pratique~65, '
+    "Connaissance~40, Culture générale~20; nuance within),\n"
+    '   "explanation": ONE FRENCH sentence, starting with a capital letter and ending '
+    "with a period, saying what it is and the expected mastery for this role.}\n"
+    "ORDER each array so items are GROUPED BY DOMAIN (contiguous), most important domain "
+    "first, and within a domain by decreasing weight. Never invent items absent from the "
+    "input/text; merge duplicates; normalise names."
 )
 
 BENEFITS_INSTRUCTIONS = (
-    "You classify the perks/benefits of a job ad into four ordered categories. "
-    "Return ONLY a JSON object with keys, in this order: \"flexibility\" (work "
-    "flexibility: remote, home office, flexible hours, extra holidays, sick days...), "
-    "\"financial\" (financial contributions: bonuses, pension/insurance, meal vouchers, "
-    "cafeteria, MultiSport...), \"training\" (learning & development: courses, "
-    "conferences, language lessons, certifications...), \"other\" (everything else). "
-    "Each value is an ARRAY of {\"name\": string, \"explanation\": string (one short "
-    "sentence)}. Only use benefits present in the input; never invent. Empty array if none."
+    "You extract and classify the perks/benefits of a job ad for a FRENCH-speaking "
+    "candidate. Consider BOTH the provided benefits list AND any benefit mentioned in "
+    "the OFFER TEXT — extract those from the text too (job ads often list perks only in "
+    "prose). Return ONLY a JSON object with keys, in this order: \"flexibility\" (remote, "
+    "home office, flexible hours, extra holidays, sick days...), \"financial\" (bonuses, "
+    "pension/insurance, meal vouchers, cafeteria, MultiSport, salary extras...), "
+    "\"training\" (courses, conferences, language lessons, certifications...), \"other\" "
+    "(everything else). Each value is an ARRAY of {\"name\": short capitalised label, "
+    "\"explanation\": ONE FRENCH sentence, starting with a capital and ending with a "
+    "period, INCLUDING any concrete detail from the ad (amount, duration, condition — "
+    "e.g. \"Tickets restaurant de 100 CZK par jour.\")}. Never invent; empty array if a "
+    "category has none."
 )
 
 VERIFY_INSTRUCTIONS = (
     "You are a faithfulness checker. Given the job ad text and a JSON draft of its "
-    "extracted software, technical_skills and categorised benefits, you return the SAME "
-    "JSON structure, corrected: REMOVE any item not supported by the text, fix wrong "
-    "explanations, drop hallucinated levels. Keep the given ordering/grouping otherwise. "
-    "Return ONLY the corrected JSON object with keys \"software\", \"technical_skills\", "
-    "\"benefits\" (benefits keeps its 4 sub-keys)."
+    "extracted software, technical_skills and categorised benefits, return the SAME JSON "
+    "structure, corrected: REMOVE any item not supported by the text, fix wrong "
+    "explanations, drop hallucinated levels. KEEP every field of each skill item "
+    "(name, domain, level, weight, explanation) and keep benefits' 4 sub-keys and the "
+    "given ordering. Ensure explanations are in French, start with a capital and end "
+    "with a period. Return ONLY the corrected JSON object with keys \"software\", "
+    "\"technical_skills\", \"benefits\"."
 )
 
 TRANSLATE_INSTRUCTIONS = (

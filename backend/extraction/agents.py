@@ -20,7 +20,7 @@ from extraction.agents_setup import ensure_agents, _SPECS
 
 log = logging.getLogger("jobradar.agents")
 
-EXTRACTION_VERSION = 2  # incrémenter pour forcer un re-traitement des offres
+EXTRACTION_VERSION = 3  # incrémenter pour forcer un re-traitement des offres
 
 _client = None
 _agents_disabled = False
@@ -108,17 +108,32 @@ def _ask_agent(agent_key: str, user_text: str, max_chars: int = 14000) -> Option
 # --------------------------------------------------------------------------- #
 # Helpers de normalisation
 # --------------------------------------------------------------------------- #
+def _cap(s: str) -> str:
+    """Majuscule initiale, sans toucher au reste (préserve SQL, Power BI…)."""
+    s = (s or "").strip()
+    return s[:1].upper() + s[1:] if s else s
+
+
+def _int_0_100(v) -> Optional[int]:
+    try:
+        return max(0, min(100, int(v)))
+    except (TypeError, ValueError):
+        return None
+
+
 def _named_list(items) -> list[dict]:
-    """Coerce une liste (str ou dict) en [{name, explanation, level}]."""
+    """Coerce en [{name, domain, level, weight, explanation}] (capitalisé)."""
     out = []
     for it in items or []:
-        if isinstance(it, str):
-            out.append({"name": it, "explanation": "", "level": None})
+        if isinstance(it, str) and it.strip():
+            out.append({"name": _cap(it), "domain": "", "level": None, "weight": None, "explanation": ""})
         elif isinstance(it, dict) and it.get("name"):
             out.append({
-                "name": str(it["name"]),
-                "explanation": str(it.get("explanation", "") or ""),
-                "level": it.get("level"),
+                "name": _cap(str(it["name"])),
+                "domain": str(it.get("domain", "") or "").strip(),
+                "level": (str(it["level"]).strip() if it.get("level") else None),
+                "weight": _int_0_100(it.get("weight")),
+                "explanation": _cap(str(it.get("explanation", "") or "")),
             })
     return out
 
@@ -126,10 +141,10 @@ def _named_list(items) -> list[dict]:
 def _named_pairs(items) -> list[dict]:
     out = []
     for it in items or []:
-        if isinstance(it, str):
-            out.append({"name": it, "explanation": ""})
+        if isinstance(it, str) and it.strip():
+            out.append({"name": _cap(it), "explanation": ""})
         elif isinstance(it, dict) and it.get("name"):
-            out.append({"name": str(it["name"]), "explanation": str(it.get("explanation", "") or "")})
+            out.append({"name": _cap(str(it["name"])), "explanation": _cap(str(it.get("explanation", "") or ""))})
     return out
 
 
@@ -189,7 +204,7 @@ def process_offer(rec: dict) -> dict:
         rec["experience_years"] = base.get("experience_years")
         rec["education"] = base.get("education") or rec.get("education") or ""
         rec["work_arrangement"] = base.get("work_arrangement") or ""
-        rec["soft_skills"] = [s for s in (base.get("soft_skills") or []) if isinstance(s, str)]
+        rec["soft_skills"] = [_cap(s) for s in (base.get("soft_skills") or []) if isinstance(s, str) and s.strip()]
         if base.get("languages"):
             rec["languages"] = base["languages"]
         if base.get("company"):

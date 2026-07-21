@@ -106,6 +106,56 @@ def run_scrape(
     return summary
 
 
+def reprocess_all(force: bool = True) -> dict:
+    """Re-passe toutes les offres dans la chaîne d'extraction (nouvelles consignes).
+
+    Pour une offre sans texte (détail jamais récupéré), on RETENTE la récupération
+    du détail avant de la ré-analyser. Relance ensuite le matching. Renvoie un
+    résumé {total, reprocessed, refetched, errors}.
+    """
+    from store import firestore_store
+    from extraction.agents import process_offer, EXTRACTION_VERSION
+    from extraction.schema import base_record_from_graphql
+    from scraper import jobs_cz
+    from scraper.jobs_cz import ListingCard
+
+    sess = _session()
+    total = reprocessed = refetched = errors = 0
+    for offer_id, offer in firestore_store.stream_offers():
+        total += 1
+        if not force and offer.get("extraction_version") == EXTRACTION_VERSION:
+            continue
+        try:
+            rec = dict(offer)
+            rec["id"] = offer_id
+            # Détail manquant -> on retente de le récupérer.
+            if not (rec.get("description_text") or "").strip() and rec.get("link"):
+                card = ListingCard(
+                    site=rec.get("site", "jobs.cz"), id=offer_id,
+                    title=rec.get("title", ""), company=rec.get("company", ""),
+                    location=rec.get("location_city", ""), link=rec["link"],
+                )
+                job_ad = jobs_cz.fetch_detail(card, sess=sess)
+                if job_ad:
+                    rec = base_record_from_graphql(card, job_ad)
+                    rec["id"] = offer_id
+                    refetched += 1
+            rec = process_offer(rec)
+            firestore_store.upsert_offer(rec)
+            reprocessed += 1
+        except Exception as e:  # noqa: BLE001
+            errors += 1
+            log.warning("reprocess %s échoué: %s", offer_id, e)
+    # Le contenu a changé -> re-matcher.
+    try:
+        run_matching(force=True)
+    except Exception as e:  # noqa: BLE001
+        log.warning("matching après reprocess échoué: %s", e)
+    summary = {"total": total, "reprocessed": reprocessed, "refetched": refetched, "errors": errors}
+    log.info("reprocess_all terminé: %s", summary)
+    return summary
+
+
 def run_matching(force: bool = False) -> int:
     """Calcule le matching des offres en attente pour le profil courant.
 
