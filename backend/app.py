@@ -283,7 +283,11 @@ def admin_test_match():
             return jsonify(error="offre introuvable"), 404
         profile = analyze_profile(text)
         result = match_offer(profile or {}, offer)
-        return jsonify(offer_title=offer.get("title"), match=result)
+        return jsonify(
+            offer_title=offer.get("title"),
+            offer_languages=offer.get("languages"),
+            match=result,
+        )
     except Exception as e:  # noqa: BLE001
         log.exception("test-match failed")
         return jsonify(error=str(e)), 500
