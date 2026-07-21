@@ -18,9 +18,31 @@ MISTRAL_API_KEY = _get("MISTRAL_API_KEY")
 MISTRAL_MODEL = _get("MISTRAL_MODEL", "mistral-small-latest")
 
 # --- Firebase / Firestore (source de vérité lue par l'app) ---
-# Chemin vers le service account JSON de l'Admin SDK, OU son contenu inline.
-FIREBASE_CREDENTIALS_PATH = _get("FIREBASE_CREDENTIALS_PATH", "serviceAccount.json")
-FIREBASE_CREDENTIALS_JSON = _get("FIREBASE_CREDENTIALS_JSON")  # alternative inline (Render)
+# Deux façons de fournir le service account :
+#  1) FIREBASE_CREDENTIALS_JSON = le JSON complet inline (variable d'env Render) ;
+#  2) un fichier serviceAccount.json (ex. « Secret File » Render, monté dans
+#     /etc/secrets/ et/ou à la racine). On cherche dans plusieurs emplacements.
+FIREBASE_CREDENTIALS_JSON = _get("FIREBASE_CREDENTIALS_JSON")
+FIREBASE_CREDENTIALS_PATH = _get("FIREBASE_CREDENTIALS_PATH", "")
+
+# Emplacements candidats pour le fichier (ordre de priorité).
+FIREBASE_CREDENTIALS_CANDIDATES = [
+    p for p in [
+        FIREBASE_CREDENTIALS_PATH,
+        "serviceAccount.json",
+        "/etc/secrets/serviceAccount.json",
+        "/etc/secrets/FIREBASE_CREDENTIALS_JSON",
+        os.path.join(os.path.dirname(__file__), "serviceAccount.json"),
+    ] if p
+]
+
+
+def resolve_credentials_file() -> str:
+    """Retourne le 1er fichier de credentials existant, ou '' si aucun."""
+    for p in FIREBASE_CREDENTIALS_CANDIDATES:
+        if os.path.exists(p):
+            return p
+    return ""
 FIRESTORE_OFFERS_COLLECTION = _get("FIRESTORE_OFFERS_COLLECTION", "offers")
 FIRESTORE_RUNS_COLLECTION = _get("FIRESTORE_RUNS_COLLECTION", "scrape_runs")
 FIRESTORE_TOKENS_COLLECTION = _get("FIRESTORE_TOKENS_COLLECTION", "device_tokens")
@@ -56,4 +78,4 @@ def mistral_ready() -> bool:
 
 
 def firestore_ready() -> bool:
-    return bool(FIREBASE_CREDENTIALS_JSON) or os.path.exists(FIREBASE_CREDENTIALS_PATH)
+    return bool(FIREBASE_CREDENTIALS_JSON) or bool(resolve_credentials_file())

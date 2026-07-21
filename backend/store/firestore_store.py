@@ -32,7 +32,13 @@ def init():
         if config.FIREBASE_CREDENTIALS_JSON:
             cred = credentials.Certificate(json.loads(config.FIREBASE_CREDENTIALS_JSON))
         else:
-            cred = credentials.Certificate(config.FIREBASE_CREDENTIALS_PATH)
+            path = config.resolve_credentials_file()
+            if not path:
+                raise RuntimeError(
+                    "Aucun credential Firebase trouvé : définir FIREBASE_CREDENTIALS_JSON "
+                    "ou fournir un fichier serviceAccount.json (Secret File Render)."
+                )
+            cred = credentials.Certificate(path)
         firebase_admin.initialize_app(cred)
     _db = firestore.client()
     return _db
