@@ -154,6 +154,74 @@ def _named_pairs(items) -> list[dict]:
     return out
 
 
+def _norm_lang(name: str) -> str:
+    s = (name or "").strip().lower()
+    if any(k in s for k in ("tch", "cze", "czech", "češ", "česk")) or s == "cs":
+        return "cs"
+    if any(k in s for k in ("angl", "engl")) or s == "en":
+        return "en"
+    if any(k in s for k in ("allem", "germ", "něm", "deutsch")) or s == "de":
+        return "de"
+    if any(k in s for k in ("ital",)) or s == "it":
+        return "it"
+    if any(k in s for k in ("franç", "french")) or s == "fr":
+        return "fr"
+    if any(k in s for k in ("slov",)) or s == "sk":
+        return "sk"
+    if any(k in s for k in ("pol",)) or s == "pl":
+        return "pl"
+    return s[:3]
+
+
+_CZ_LEVELS = {
+    "základní": "Basic (A1-A2)",
+    "mírně pokročilá": "Pre-intermediate (A2-B1)",
+    "středně pokročilá": "Intermediate (B1-B2)",
+    "pokročilá": "Advanced (B2-C1)",
+    "výborná": "Excellent (C1-C2)",
+    "rodilý mluvčí": "Native",
+}
+
+
+def _norm_level(lvl):
+    if not lvl:
+        return lvl
+    return _CZ_LEVELS.get(str(lvl).strip().lower(), lvl)
+
+
+def _merge_languages(agent_langs: list, structured_langs: list) -> list:
+    """Fusionne : les langues du champ « requises » de l'offre (structuré) sont
+    AUTORITAIRES et restent impératives ; l'agent enrichit (niveau/raison) et peut
+    ajouter des langues déduites en plus."""
+    structured_langs = structured_langs or []
+    agent_langs = agent_langs or []
+    if not structured_langs:
+        return agent_langs
+    required = {_norm_lang(l.get("language")) for l in structured_langs if l.get("language")}
+    struct_by = {_norm_lang(l.get("language")): l for l in structured_langs if l.get("language")}
+    out = []
+    seen = set()
+    for al in agent_langs:
+        key = _norm_lang(al.get("language"))
+        seen.add(key)
+        if key in required:
+            al = dict(al)
+            al["mandatory"] = True  # présent dans les langues requises -> impératif
+            if not al.get("level") and struct_by[key].get("level"):
+                al["level"] = _norm_level(struct_by[key]["level"])
+        out.append(al)
+    # langues requises non reprises par l'agent -> on les ajoute
+    for key in required - seen:
+        sl = struct_by[key]
+        out.append({
+            "language": sl.get("language"),
+            "level": _norm_level(sl.get("level")),
+            "mandatory": True,
+            "reason": "Langue listée comme requise dans l'offre.",
+        })
+    return out
+
+
 _BENEFIT_CATS = ("flexibility", "financial", "training", "other")
 
 
@@ -202,6 +270,9 @@ def process_offer(rec: dict) -> dict:
     original_text = rec.get("description_text") or ""
     working_title = rec.get("title") or ""
     working_text = original_text
+    # Langues requises structurées (jobs.cz) = source autoritaire, capturée avant
+    # que l'agent d'extraction ne (ré)écrive rec["languages"].
+    structured_langs = list(rec.get("languages") or [])
 
     # 0) Traduction cz -> en (on garde les 2 versions).
     if source_lang.startswith("cs") and original_text:
@@ -229,8 +300,8 @@ def process_offer(rec: dict) -> dict:
         rec["education"] = base.get("education") or rec.get("education") or ""
         rec["work_arrangement"] = base.get("work_arrangement") or ""
         rec["soft_skills"] = [_cap(s) for s in (base.get("soft_skills") or []) if isinstance(s, str) and s.strip()]
-        if base.get("languages"):
-            rec["languages"] = base["languages"]
+        if base.get("languages") or structured_langs:
+            rec["languages"] = _merge_languages(base.get("languages"), structured_langs)
         if base.get("company"):
             rec["company"] = base["company"]
         rec["intermediary"] = base.get("intermediary") or ""
