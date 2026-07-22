@@ -299,6 +299,7 @@ def admin_reprocess_all():
     """Re-traite toutes les offres (nouvelles consignes d'agents) en tâche de fond."""
     if not _authorized(request):
         return jsonify(error="unauthorized"), 401
+    only_empty = bool((request.get_json(silent=True) or {}).get("only_empty"))
     with _lock:
         if _state["running"]:
             return jsonify(status="already_running"), 409
@@ -306,7 +307,7 @@ def admin_reprocess_all():
 
     def _run():
         try:
-            summary = pipeline.reprocess_all(force=True, progress=_progress_cb)
+            summary = pipeline.reprocess_all(force=True, only_empty=only_empty, progress=_progress_cb)
             with _lock:
                 _state["last"] = summary
         except Exception as e:  # noqa: BLE001

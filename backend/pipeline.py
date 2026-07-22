@@ -124,12 +124,17 @@ def run_scrape(
     return summary
 
 
-def reprocess_all(force: bool = True, progress: Optional[Callable] = None) -> dict:
-    """Re-passe toutes les offres dans la chaîne d'extraction (nouvelles consignes).
+def reprocess_all(
+    force: bool = True, only_empty: bool = False, progress: Optional[Callable] = None
+) -> dict:
+    """Re-passe les offres dans la chaîne d'extraction (nouvelles consignes).
 
     Pour une offre sans texte (détail jamais récupéré), on RETENTE la récupération
     du détail avant de la ré-analyser. Relance ensuite le matching. Renvoie un
     résumé {total, reprocessed, refetched, errors}.
+
+    `only_empty=True` : ne traite QUE les offres au contenu vide (détail jamais
+    récupéré) — passe ciblée et légère (ex. après un correctif de scraping).
     """
     from store import firestore_store
     from extraction.agents import process_offer, EXTRACTION_VERSION
@@ -143,8 +148,11 @@ def reprocess_all(force: bool = True, progress: Optional[Callable] = None) -> di
     reprocessed = refetched = errors = 0
     for i, (offer_id, offer) in enumerate(offers, 1):
         if progress:
-            progress(i, total, "Ré-analyse des offres")
-        if not force and offer.get("extraction_version") == EXTRACTION_VERSION:
+            progress(i, total, "Ré-analyse des offres vides" if only_empty else "Ré-analyse des offres")
+        if only_empty:
+            if (offer.get("description_text") or "").strip():
+                continue  # a déjà du contenu -> on n'y touche pas
+        elif not force and offer.get("extraction_version") == EXTRACTION_VERSION:
             continue
         try:
             rec = dict(offer)
