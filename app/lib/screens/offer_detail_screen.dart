@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/offer.dart';
+import '../models/profile.dart';
+import '../services/auth_service.dart';
+import '../services/company_service.dart';
+import '../services/offers_service.dart';
+import '../services/profile_service.dart';
+import '../services/scrape_service.dart';
+import 'company_detail_screen.dart' show openMaps;
 import '../widgets/app_scaffold.dart';
 import '../widgets/explained_list.dart';
 import '../widgets/match_card.dart';
@@ -21,6 +29,7 @@ class OfferDetailScreen extends StatefulWidget {
 
 class _OfferDetailScreenState extends State<OfferDetailScreen> {
   late bool _showEnglish = widget.offer.isCzech;
+  bool _rematching = false;
   Offer get o => widget.offer;
 
   String get _summary => (_showEnglish && o.hasTranslation) ? o.translated!.summary : o.summary;
@@ -30,12 +39,48 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
     if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  /// Recalcule le matching de CETTE offre uniquement (prend en compte les
+  /// niveaux édités à l'instant). La carte se met à jour en direct via Firestore.
+  Future<void> _rematch() async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _rematching = true);
+    final ok = await context.read<ScrapeService>().matchOne(o.id);
+    if (!mounted) return;
+    setState(() => _rematching = false);
+    messenger.showSnackBar(SnackBar(
+      content: Text(ok
+          ? 'Matching de cette offre recalculé ✓'
+          : 'Échec du recalcul (serveur injoignable ?).'),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final benefits = o.benefits;
     return AppScaffold(
       title: 'Fiche offre',
+      footer: _rematching
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(children: const [
+                  Icon(Symbols.calculate, size: 16),
+                  SizedBox(width: 6),
+                  Text('Recalcul du matching de cette offre…'),
+                ]),
+                const SizedBox(height: 6),
+                const LinearProgressIndicator(minHeight: 3),
+              ],
+            )
+          : null,
       actions: [
+        _favAction(context),
+        IconButton(
+          tooltip: 'Actualiser le matching de cette offre',
+          icon: const Icon(Symbols.calculate),
+          onPressed: _rematching ? null : _rematch,
+        ),
         if (o.hasTranslation)
           PopupMenuButton<bool>(
             tooltip: 'Langue',
@@ -51,6 +96,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
       floatingActionButton: o.applyUrl.isEmpty
           ? null
           : FloatingActionButton.extended(
+              heroTag: 'fab-apply', // tag unique : évite la collision Hero
               onPressed: _apply,
               icon: const Icon(Symbols.open_in_new),
               label: const Text('Postuler'),
@@ -64,15 +110,13 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           _line(Symbols.apartment, o.company),
           if (o.intermediary.isNotEmpty) _line(Symbols.handshake, 'Recruté via ${o.intermediary}'),
           if (o.locationLabel.isNotEmpty) _line(Symbols.location_on, o.locationLabel),
+          _itineraire(context),
           if (o.publishedAt != null) _line(Symbols.event, _fmtDate(o.publishedAt!)),
           const SizedBox(height: 14),
           _metaTable(context),
 
-          // 2) Matching (si calculé)
-          if (o.match != null) ...[
-            const SizedBox(height: 16),
-            MatchCard(match: o.match!),
-          ],
+          // 2) Matching (si calculé) — en direct pour refléter un re-match.
+          _matchSection(context),
 
           // 3) Résumé + accès offre complète
           if (_summary.isNotEmpty) ...[
@@ -101,9 +145,9 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           // 4) Langues
           if (o.languages.isNotEmpty) _languages(context),
 
-          // 5) Compétences & technologies (logiciels + compétences fusionnés, par domaine)
+          // 5) Compétences & technologies — avec édition de TON niveau (→ profil).
           if (o.software.isNotEmpty || o.technicalSkills.isNotEmpty)
-            SkillBlock(software: o.software, technical: o.technicalSkills),
+            _skillsSection(context),
 
           // 7) Compétences humaines
           if (o.softSkills.isNotEmpty) ...[
@@ -136,6 +180,111 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  /// Bouton « Itinéraire » — affiché seulement si l'entreprise est localisée.
+  Widget _itineraire(BuildContext context) {
+    if (o.company.isEmpty) return const SizedBox.shrink();
+    return StreamBuilder<Company?>(
+      stream: context.read<CompanyService>().watch(o.company),
+      builder: (context, snap) {
+        final loc = snap.data?.location;
+        if (loc == null || loc.query.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              onPressed: () => openMaps(loc.query),
+              icon: const Icon(Symbols.directions, size: 18),
+              label: Text('Itinéraire${loc.city != null && loc.city!.isNotEmpty ? ' · ${loc.city}' : ''}'),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Étoile de favori dans l'appbar, reflétant l'état en direct.
+  Widget _favAction(BuildContext context) {
+    return StreamBuilder<Offer?>(
+      stream: context.read<OffersService>().watchOffer(o.id),
+      initialData: o,
+      builder: (context, snap) {
+        final fav = snap.data?.isFavorite ?? o.isFavorite;
+        return IconButton(
+          tooltip: fav ? 'Retirer des favoris' : 'Ajouter aux favoris',
+          icon: Icon(Symbols.star,
+              fill: fav ? 1 : 0, color: fav ? Colors.amber.shade600 : null),
+          onPressed: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            final err = await context.read<OffersService>().toggleFavorite(o.id, !fav);
+            if (err != null) messenger.showSnackBar(SnackBar(content: Text(err)));
+          },
+        );
+      },
+    );
+  }
+
+  /// Carte de matching, mise à jour en direct (reflète un re-match d'offre).
+  Widget _matchSection(BuildContext context) {
+    return StreamBuilder<Offer?>(
+      stream: context.read<OffersService>().watchOffer(o.id),
+      initialData: o,
+      builder: (context, snap) {
+        final m = snap.data?.match ?? o.match;
+        if (m == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: MatchCard(match: m),
+        );
+      },
+    );
+  }
+
+  /// Section compétences : niveau requis par l'offre + TON niveau (éditable →
+  /// enregistré dans le profil, appariement par nom).
+  Widget _skillsSection(BuildContext context) {
+    final uid = context.read<AuthService>().currentUser?.uid;
+    final profileService = context.read<ProfileService>();
+    if (uid == null) {
+      return SkillBlock(software: o.software, technical: o.technicalSkills);
+    }
+    return StreamBuilder<Profile?>(
+      stream: profileService.watch(uid),
+      builder: (context, snap) {
+        final prof = snap.data;
+        final levels = <String, String>{};
+        if (prof != null) {
+          for (final s in [...prof.hardSkillItems, ...prof.softwareItems]) {
+            if (s.level != null && s.level!.isNotEmpty) {
+              levels[s.name.toLowerCase().trim()] = s.level!;
+            }
+          }
+        }
+        return SkillBlock(
+          software: o.software,
+          technical: o.technicalSkills,
+          userLevels: prof == null ? null : levels,
+          onSetUserLevel: prof == null
+              ? null
+              : (item, isSoftware, level) {
+                  final section = isSoftware ? 'software' : 'hard_skills';
+                  final current = prof.structured[section] is List
+                      ? List<dynamic>.from(prof.structured[section] as List)
+                      : <dynamic>[];
+                  profileService.setSkill(
+                    uid: uid,
+                    sectionKey: section,
+                    current: current,
+                    name: item.name,
+                    domain: item.domain,
+                    level: level,
+                  );
+                },
+        );
+      },
     );
   }
 

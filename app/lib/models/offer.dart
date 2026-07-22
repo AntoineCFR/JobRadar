@@ -66,11 +66,33 @@ class MatchBlocker {
   final String issue;
   final String severity; // haute | moyenne | basse
   MatchBlocker({required this.issue, this.severity = 'moyenne'});
-  factory MatchBlocker.from(dynamic v) => v is Map
-      ? MatchBlocker(
-          issue: (v['issue'] ?? '').toString(),
-          severity: (v['severity'] ?? 'moyenne').toString())
-      : MatchBlocker(issue: v.toString());
+
+  /// Normalise une sévérité (accepte l'anglais que le LLM produit parfois).
+  static String _sev(dynamic v) {
+    final s = (v ?? '').toString().toLowerCase().trim();
+    const map = {
+      'high': 'haute', 'haute': 'haute', 'critical': 'haute', 'severe': 'haute',
+      'medium': 'moyenne', 'moderate': 'moyenne', 'moyenne': 'moyenne',
+      'low': 'basse', 'basse': 'basse', 'minor': 'basse',
+    };
+    return map[s] ?? 'moyenne';
+  }
+
+  /// Tolérant : le LLM renvoie parfois `{reason,severity}` au lieu de
+  /// `{issue,severity}`, ou imbrique l'objet sous `issue`. On récupère le texte
+  /// où qu'il soit et on évite d'afficher une Map brute (`{severity: …}`).
+  factory MatchBlocker.from(dynamic v) {
+    if (v is Map) {
+      dynamic raw = v['issue'] ?? v['reason'] ?? v['description'] ?? v['text'] ?? '';
+      dynamic sevRaw = v['severity'] ?? v['level'];
+      if (raw is Map) {
+        sevRaw ??= raw['severity'] ?? raw['level'];
+        raw = raw['issue'] ?? raw['reason'] ?? raw['description'] ?? raw['text'] ?? '';
+      }
+      return MatchBlocker(issue: raw.toString().trim(), severity: _sev(sevRaw));
+    }
+    return MatchBlocker(issue: v.toString().trim());
+  }
 }
 
 /// Résultat du matching offre × profil.
@@ -104,7 +126,10 @@ class MatchResult {
       verdict: (v['verdict'] ?? '').toString(),
       synthese: (v['synthese'] ?? '').toString(),
       blockers: (v['blockers'] is List)
-          ? (v['blockers'] as List).map(MatchBlocker.from).toList()
+          ? (v['blockers'] as List)
+              .map(MatchBlocker.from)
+              .where((b) => b.issue.isNotEmpty) // pas de puce vide (cf. point 4)
+              .toList()
           : <MatchBlocker>[],
       matches: _s(v['matches']),
       plan: _s(v['plan']),
@@ -172,6 +197,9 @@ class Offer {
   final int? relevanceScore; // pertinence de l'offre vs le mot-clé recherché
   final String relevanceReason;
   final bool isRead;
+  final bool isFavorite;
+  final String status; // active | expired
+  final Timestamp? expiredAt;
   final Timestamp? firstSeenAt;
 
   Offer({
@@ -207,8 +235,13 @@ class Offer {
     required this.relevanceScore,
     required this.relevanceReason,
     required this.isRead,
+    required this.isFavorite,
+    required this.status,
+    required this.expiredAt,
     required this.firstSeenAt,
   });
+
+  bool get isExpired => status == 'expired';
 
   bool get hasTranslation => translated != null;
   bool get isCzech => sourceLanguage == 'cs';
@@ -289,6 +322,9 @@ class Offer {
       relevanceReason:
           (d['relevance'] is Map) ? (d['relevance']['reason'] ?? '').toString() : '',
       isRead: d['is_read'] == true,
+      isFavorite: d['is_favorite'] == true,
+      status: (d['status'] ?? 'active').toString(),
+      expiredAt: d['expired_at'] is Timestamp ? d['expired_at'] as Timestamp : null,
       firstSeenAt: d['first_seen_at'] is Timestamp ? d['first_seen_at'] as Timestamp : null,
     );
   }

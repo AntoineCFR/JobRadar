@@ -8,7 +8,8 @@ import '../models/offer.dart';
 class OfferTile extends StatelessWidget {
   final Offer offer;
   final VoidCallback onTap;
-  const OfferTile({super.key, required this.offer, required this.onTap});
+  final ValueChanged<bool>? onToggleFavorite;
+  const OfferTile({super.key, required this.offer, required this.onTap, this.onToggleFavorite});
 
   static Color scoreColor(int s) => s >= 75
       ? Colors.green.shade600
@@ -87,7 +88,11 @@ class OfferTile extends StatelessWidget {
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w600, height: 1.2)),
                         ),
-                        if (!offer.isRead) _newDot(scheme),
+                        if (offer.isExpired)
+                          _pill(scheme, 'EXPIRÉE', scheme.errorContainer, scheme.onErrorContainer)
+                        else if (!offer.isRead)
+                          _newDot(scheme),
+                        _favStar(scheme),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -203,13 +208,31 @@ class OfferTile extends StatelessWidget {
     return tip != null ? _tip(tip, bar) : bar;
   }
 
-  Widget _newDot(ColorScheme scheme) => Container(
+  /// Étoile de favori : jaune si l'offre est marquée, contour sinon.
+  Widget _favStar(ColorScheme scheme) => InkResponse(
+        onTap: onToggleFavorite == null ? null : () => onToggleFavorite!(!offer.isFavorite),
+        radius: 20,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 6, top: 1),
+          child: Icon(
+            offer.isFavorite ? Symbols.star : Symbols.star,
+            fill: offer.isFavorite ? 1 : 0,
+            size: 22,
+            color: offer.isFavorite ? Colors.amber.shade600 : scheme.onSurfaceVariant,
+          ),
+        ),
+      );
+
+  Widget _newDot(ColorScheme scheme) =>
+      _pill(scheme, 'NEW', scheme.primary, scheme.onPrimary);
+
+  Widget _pill(ColorScheme scheme, String label, Color bg, Color fg) => Container(
         margin: const EdgeInsets.only(left: 8, top: 2),
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(color: scheme.primary, borderRadius: BorderRadius.circular(20)),
-        child: Text('NEW',
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+        child: Text(label,
             style: TextStyle(
-                color: scheme.onPrimary, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                color: fg, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
       );
 
   Widget _iconLine(BuildContext context, IconData icon, String text) {

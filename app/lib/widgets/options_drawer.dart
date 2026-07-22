@@ -7,16 +7,14 @@ import '../services/auth_service.dart';
 /// Drawer latéral : actions globales.
 class OptionsDrawer extends StatelessWidget {
   final VoidCallback onNewSearch;
-  final VoidCallback onMarkAllRead;
-  final VoidCallback onOpenProfile;
   final VoidCallback onScanNew;
+  final VoidCallback onOpenExpired;
 
   const OptionsDrawer({
     super.key,
     required this.onNewSearch,
-    required this.onMarkAllRead,
-    required this.onOpenProfile,
     required this.onScanNew,
+    required this.onOpenExpired,
   });
 
   @override
@@ -45,15 +43,6 @@ class OptionsDrawer extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Symbols.badge),
-              title: const Text('Mon profil'),
-              subtitle: const Text('CV / compétences pour le matching'),
-              onTap: () {
-                Navigator.pop(context);
-                onOpenProfile();
-              },
-            ),
-            ListTile(
               leading: const Icon(Symbols.radar),
               title: const Text('Scanner les nouvelles offres'),
               subtitle: const Text('récupère + analyse les nouveautés'),
@@ -62,13 +51,13 @@ class OptionsDrawer extends StatelessWidget {
                 onScanNew();
               },
             ),
-            const Divider(height: 1),
             ListTile(
-              leading: const Icon(Symbols.done_all),
-              title: const Text('Tout marquer comme lu'),
+              leading: const Icon(Symbols.history),
+              title: const Text('Offres expirées'),
+              subtitle: const Text('offres non retrouvées au scraping'),
               onTap: () {
                 Navigator.pop(context);
-                onMarkAllRead();
+                onOpenExpired();
               },
             ),
             const Spacer(),

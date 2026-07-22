@@ -9,7 +9,7 @@ import '../services/profile_service.dart';
 import '../services/scrape_service.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/backend_activity_bar.dart';
-import '../widgets/skill_block.dart';
+import 'profile_section_screen.dart';
 
 /// Écran « Mon profil » : joindre un PDF de compétences → analysé par l'IA,
 /// puis utilisé pour matcher les offres.
@@ -50,6 +50,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ));
   }
 
+  Future<void> _recalcMatching() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await context.read<ScrapeService>().triggerMatch(force: true);
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(
+      content: Text(ok
+          ? 'Matching recalculé en arrière-plan avec ton profil à jour. Les scores se mettront à jour au fil de l\'eau.'
+          : 'Impossible de lancer le recalcul (serveur injoignable ou déjà en cours ?).'),
+    ));
+  }
+
   Future<void> _reanalyzeAll() async {
     final scrape = context.read<ScrapeService>();
     final messenger = ScaffoldMessenger.of(context);
@@ -82,6 +93,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title: 'Mon profil',
       actions: [
         IconButton(
+          tooltip: 'Recalculer le matching (prend en compte tes modifications)',
+          icon: const Icon(Symbols.calculate),
+          onPressed: _recalcMatching,
+        ),
+        IconButton(
           tooltip: 'Ré-analyser toutes les offres',
           icon: const Icon(Symbols.autorenew),
           onPressed: _reanalyzeAll,
@@ -89,12 +105,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
       footer: const BackendActivityBar(fallbackLabel: 'Analyse / matching des offres…'),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab-profile-attach', // tag unique : évite la collision Hero
         onPressed: _busy ? null : _pickAndUpload,
         icon: _busy
             ? const SizedBox(
                 width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
             : const Icon(Symbols.upload_file),
-        label: Text(_busy ? 'Analyse…' : 'Joindre / remplacer (PDF ou .md)'),
+        label: Text(_busy ? 'Analyse…' : 'Joindre / compléter (PDF ou .md)'),
       ),
       body: uid == null
           ? const Center(child: Text('Non connecté.'))
@@ -103,7 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               builder: (context, snap) {
                 final p = snap.data;
                 if (p == null) return _empty(context);
-                return _profileView(context, p);
+                return _profileView(context, uid, p);
               },
             ),
     );
@@ -129,7 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
 
-  Widget _profileView(BuildContext context, Profile p) {
+  Widget _profileView(BuildContext context, String uid, Profile p) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
       children: [
@@ -141,12 +158,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 14),
           Text(p.summary, style: const TextStyle(height: 1.4)),
         ],
-        _chips(context, Symbols.thumb_up, 'Points forts', p.strengths, Colors.green.shade600),
-        _chips(context, Symbols.warning, 'Lacunes', p.gaps, Colors.orange.shade700),
-        _chips(context, Symbols.translate, 'Langues', p.languages, null),
-        if (p.hardSkillItems.isNotEmpty || p.softwareItems.isNotEmpty)
-          SkillBlock(software: p.softwareItems, technical: p.hardSkillItems),
+        const SizedBox(height: 20),
+        Text('Mes informations',
+            style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text('Touche une section pour l’éditer (ajout, suppression, niveau).',
+            style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 12),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.5,
+          children: [
+            for (final s in kProfileSections) _sectionTile(context, uid, p, s),
+          ],
+        ),
       ],
+    );
+  }
+
+  Widget _sectionTile(BuildContext context, String uid, Profile p, ProfileSection s) {
+    final scheme = Theme.of(context).colorScheme;
+    final v = p.structured[s.key];
+    final count = v is List ? v.length : 0;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfileSectionScreen(uid: uid, section: s, initialValue: v),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(s.icon, size: 30, color: scheme.primary),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(s.title,
+                      style: const TextStyle(fontWeight: FontWeight.w600, height: 1.15)),
+                  const SizedBox(height: 2),
+                  Text(count == 0 ? 'à compléter' : '$count élément${count > 1 ? 's' : ''}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -191,7 +259,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ]),
             ],
             const SizedBox(height: 6),
-            Text('Joindre un nouveau document remplace celui-ci.',
+            Text('Un nouveau document ne met à jour que les sections qu\'il '
+                'mentionne — le reste de ton profil est conservé.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant, fontStyle: FontStyle.italic)),
           ],
@@ -200,25 +269,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _chips(BuildContext c, IconData icon, String title, List<String> items, Color? color) {
-    if (items.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 18),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(icon, size: 18, color: color ?? Theme.of(c).colorScheme.primary),
-          const SizedBox(width: 8),
-          Text(title, style: Theme.of(c).textTheme.titleSmall),
-        ]),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: items
-              .map((e) => Chip(label: Text(e), visualDensity: VisualDensity.compact))
-              .toList(),
-        ),
-      ]),
-    );
-  }
 }

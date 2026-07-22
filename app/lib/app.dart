@@ -2,8 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
-import 'screens/offers_screen.dart';
 import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
 
@@ -35,7 +35,7 @@ class _AuthGate extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
-        return snapshot.data == null ? const LoginScreen() : const OffersScreen();
+        return snapshot.data == null ? const LoginScreen() : const HomeShell();
       },
     );
   }

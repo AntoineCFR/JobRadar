@@ -12,12 +12,16 @@ import '../widgets/offer_tile.dart';
 import '../widgets/options_drawer.dart';
 import '../widgets/scrape_dialog.dart';
 import 'offer_detail_screen.dart';
-import 'profile_screen.dart';
 
 enum SortMode { pertinence, match, date }
 
 class OffersScreen extends StatefulWidget {
-  const OffersScreen({super.key});
+  /// Onglet « Favoris » : n'affiche que les offres étoilées, sans recherche.
+  final bool favoritesOnly;
+
+  /// Page « Offres expirées » : n'affiche que les offres expirées, sans recherche.
+  final bool expiredOnly;
+  const OffersScreen({super.key, this.favoritesOnly = false, this.expiredOnly = false});
 
   @override
   State<OffersScreen> createState() => _OffersScreenState();
@@ -27,6 +31,19 @@ class _OffersScreenState extends State<OffersScreen> {
   SortMode _sort = SortMode.pertinence;
   OfferFilters _filters = OfferFilters();
   String _query = '';
+  final ScrollController _scrollController = ScrollController();
+
+  /// Onglet Favoris : ensemble figé des offres favorites à l'entrée de la page.
+  /// Dé-favoriser une tuile ne la retire PAS tout de suite (anti-misclic) — elle
+  /// reste jusqu'au rechargement de la page (nouvelle entrée dans l'onglet, qui
+  /// recrée cet état via une clé changeante côté HomeShell).
+  Set<String>? _frozenFavIds;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   Future<void> _launchSearch() async {
     final scrapeService = context.read<ScrapeService>();
@@ -48,8 +65,8 @@ class _OffersScreenState extends State<OffersScreen> {
     ));
   }
 
-  void _openProfile() =>
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+  void _openExpired() => Navigator.push(context,
+      MaterialPageRoute(builder: (_) => const OffersScreen(expiredOnly: true)));
 
   Future<void> _openFilters() async {
     final res = await FilterDialog.show(context, _filters);
@@ -59,6 +76,17 @@ class _OffersScreenState extends State<OffersScreen> {
   List<Offer> _prepare(List<Offer> offers) {
     final q = _query.toLowerCase();
     var list = offers.where((o) {
+      // Sélection de base selon le mode de la page.
+      if (widget.expiredOnly) {
+        if (!o.isExpired) return false;
+      } else if (widget.favoritesOnly) {
+        // Vue Favoris : ensemble FIGÉ (pas l'état live) pour ne pas retirer une
+        // tuile dès le dé-clic sur l'étoile.
+        if (!(_frozenFavIds?.contains(o.id) ?? false)) return false;
+      } else {
+        // Liste principale : les offres expirées disparaissent (page dédiée).
+        if (o.isExpired) return false;
+      }
       if (_filters.unreadOnly && o.isRead) return false;
       if (_filters.juniorOnly && !o.isJunior) return false;
       if (_filters.hideCzechMandatory && o.requiresMandatoryCzech) return false;
@@ -112,18 +140,26 @@ class _OffersScreenState extends State<OffersScreen> {
       stream: offersService.watchOffers(),
       builder: (context, snapshot) {
         final all = snapshot.data ?? [];
+        // Fige l'ensemble des favoris à la 1re émission de données de cette page.
+        if (widget.favoritesOnly && _frozenFavIds == null && snapshot.hasData) {
+          _frozenFavIds = all.where((o) => o.isFavorite).map((o) => o.id).toSet();
+        }
         final offers = _prepare(all);
         final unread = all.where((o) => !o.isRead).length;
         final nFilters = _filters.activeCount;
 
+        final secondary = widget.favoritesOnly || widget.expiredOnly;
         return AppScaffold(
-          title: 'Offres',
-          drawer: OptionsDrawer(
-            onNewSearch: _launchSearch,
-            onMarkAllRead: () => offersService.markAllRead(all),
-            onOpenProfile: _openProfile,
-            onScanNew: _scanNew,
-          ),
+          title: widget.expiredOnly
+              ? 'Offres expirées'
+              : (widget.favoritesOnly ? 'Favoris' : 'Offres'),
+          drawer: secondary
+              ? null
+              : OptionsDrawer(
+                  onNewSearch: _launchSearch,
+                  onScanNew: _scanNew,
+                  onOpenExpired: _openExpired,
+                ),
           actions: [
             IconButton(
               tooltip: 'Filtrer',
@@ -146,11 +182,14 @@ class _OffersScreenState extends State<OffersScreen> {
               ],
             ),
           ],
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: _launchSearch,
-            icon: const Icon(Symbols.travel_explore),
-            label: const Text('Rechercher'),
-          ),
+          floatingActionButton: secondary
+              ? null
+              : FloatingActionButton.extended(
+                  heroTag: 'fab-search', // tag unique : évite la collision Hero
+                  onPressed: _launchSearch,
+                  icon: const Icon(Symbols.travel_explore),
+                  label: const Text('Rechercher'),
+                ),
           footer: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -196,32 +235,54 @@ class _OffersScreenState extends State<OffersScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Symbols.search_off, size: 48),
+            Icon(
+                widget.expiredOnly
+                    ? Symbols.history
+                    : (widget.favoritesOnly ? Symbols.star : Symbols.search_off),
+                size: 48),
             const SizedBox(height: 12),
-            const Text('Aucune offre à afficher.'),
+            Text(widget.expiredOnly
+                ? 'Aucune offre expirée.'
+                : (widget.favoritesOnly ? 'Aucun favori.' : 'Aucune offre à afficher.')),
             const SizedBox(height: 4),
-            Text('Lance une recherche ou ajuste les filtres.',
+            Text(
+                widget.expiredOnly
+                    ? 'Les offres non retrouvées au scraping apparaîtront ici.'
+                    : (widget.favoritesOnly
+                        ? "Touche l'étoile ⭐ sur une offre pour l'ajouter ici."
+                        : 'Lance une recherche ou ajuste les filtres.'),
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
       );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 88),
-      itemCount: offers.length,
-      itemBuilder: (context, i) {
-        final offer = offers[i];
-        return OfferTile(
-          offer: offer,
-          onTap: () {
-            context.read<OffersService>().markRead(offer.id, true);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => OfferDetailScreen(offer: offer)),
-            );
-          },
-        );
-      },
+    return Scrollbar(
+      controller: _scrollController,
+      thumbVisibility: true,
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 88),
+        itemCount: offers.length,
+        itemBuilder: (context, i) {
+          final offer = offers[i];
+          return OfferTile(
+            offer: offer,
+            onToggleFavorite: (fav) async {
+              final messenger = ScaffoldMessenger.of(context);
+              final err = await context.read<OffersService>().toggleFavorite(offer.id, fav);
+              if (err != null) messenger.showSnackBar(SnackBar(content: Text(err)));
+            },
+            onTap: () {
+              context.read<OffersService>().markRead(offer.id, true);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => OfferDetailScreen(offer: offer)),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

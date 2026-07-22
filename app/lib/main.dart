@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'app.dart';
 import 'services/auth_service.dart';
+import 'services/company_service.dart';
 import 'services/messaging_service.dart';
 import 'services/offers_service.dart';
 import 'services/profile_service.dart';
@@ -25,6 +26,7 @@ Future<void> main() async {
         Provider(create: (_) => OffersService()),
         Provider(create: (_) => ScrapeService()),
         Provider(create: (_) => ProfileService()),
+        Provider(create: (_) => CompanyService()),
       ],
       child: const JobRadarApp(),
     ),

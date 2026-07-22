@@ -7,10 +7,26 @@ import '../models/offer.dart';
 /// compétences techniques, regroupés par domaine (mêmes catégories des 2 côtés).
 /// Une icône distingue logiciel/techno vs compétence ; le niveau est indiqué
 /// par un petit compteur discret à droite.
+/// Niveaux de maîtrise sélectionnables pour « ton niveau » (édition depuis l'offre).
+const _kUserLevels = <String>['Maîtrise', 'Pratique habituelle', 'Déjà pratiqué', 'Notion'];
+
 class SkillBlock extends StatelessWidget {
   final List<SkillItem> software;
   final List<SkillItem> technical;
-  const SkillBlock({super.key, required this.software, required this.technical});
+
+  /// Édition « ton niveau » (facultatif) : niveau de l'utilisateur par nom de
+  /// compétence (clé en minuscules) + callback de sauvegarde. Si `onSetUserLevel`
+  /// est fourni, chaque ligne affiche un sélecteur de niveau personnel.
+  final Map<String, String>? userLevels;
+  final void Function(SkillItem item, bool isSoftware, String? level)? onSetUserLevel;
+
+  const SkillBlock({
+    super.key,
+    required this.software,
+    required this.technical,
+    this.userLevels,
+    this.onSetUserLevel,
+  });
 
   static Color _levelColor(String? level) => switch (level) {
         'Maîtrise' => Colors.green.shade600,
@@ -134,6 +150,41 @@ class SkillBlock extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant, height: 1.3)),
             ),
+          if (onSetUserLevel != null) _userLevelEditor(context, e),
+        ],
+      ),
+    );
+  }
+
+  /// Sélecteur « ton niveau » : ajuste (ou ajoute/retire) la compétence dans le profil.
+  Widget _userLevelEditor(BuildContext context, _Entry e) {
+    final scheme = Theme.of(context).colorScheme;
+    final current = userLevels?[e.item.name.toLowerCase().trim()];
+    final has = current != null && _kUserLevels.contains(current);
+    return Padding(
+      padding: const EdgeInsets.only(left: 24, top: 3),
+      child: Row(
+        children: [
+          Icon(has ? Symbols.person_check : Symbols.person_add,
+              size: 14, color: has ? scheme.primary : scheme.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text('Ton niveau :',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+          const SizedBox(width: 6),
+          DropdownButton<String>(
+            value: has ? current : null,
+            hint: Text('je ne l’ai pas',
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+            isDense: true,
+            style: TextStyle(fontSize: 12.5, color: scheme.onSurface),
+            underline: const SizedBox.shrink(),
+            items: [
+              ..._kUserLevels.map((l) => DropdownMenuItem(value: l, child: Text(l))),
+              const DropdownMenuItem(value: '__none__', child: Text('je ne l’ai pas')),
+            ],
+            onChanged: (v) =>
+                onSetUserLevel!(e.item, e.isSoftware, v == '__none__' ? null : v),
+          ),
         ],
       ),
     );

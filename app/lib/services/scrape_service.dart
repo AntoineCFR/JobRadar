@@ -67,8 +67,10 @@ class ScrapeService {
   /// Ré-analyse TOUTE la collection : regénère l'analyse IA de chaque offre.
   Future<bool> reanalyzeAll() => _post('/admin/reprocess-all');
 
-  /// Déclenche le (re)matching des offres en attente côté backend.
-  Future<bool> triggerMatch() async {
+  /// Déclenche le (re)matching des offres côté backend.
+  /// `force: true` recalcule TOUTES les offres (nécessaire après une édition
+  /// manuelle du profil, qui ne change pas la version du document).
+  Future<bool> triggerMatch({bool force = false}) async {
     try {
       final resp = await http.post(
         Uri.parse('${AppConfig.apiBaseUrl}/match'),
@@ -76,9 +78,27 @@ class ScrapeService {
           'Content-Type': 'application/json',
           if (AppConfig.apiKey.isNotEmpty) 'X-JobRadar-Key': AppConfig.apiKey,
         },
-        body: '{}',
+        body: jsonEncode({'force': force}),
       ).timeout(const Duration(seconds: 20));
       return resp.statusCode == 202;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// (Re)matche UNE seule offre côté backend (synchrone). Renvoie true si OK.
+  /// Timeout long : le matching d'une offre enchaîne 2 appels IA.
+  Future<bool> matchOne(String offerId) async {
+    try {
+      final resp = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/match-one'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (AppConfig.apiKey.isNotEmpty) 'X-JobRadar-Key': AppConfig.apiKey,
+        },
+        body: jsonEncode({'id': offerId}),
+      ).timeout(const Duration(seconds: 90));
+      return resp.statusCode == 200;
     } catch (_) {
       return false;
     }

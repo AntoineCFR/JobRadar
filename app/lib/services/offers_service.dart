@@ -17,8 +17,30 @@ class OffersService {
             .toList());
   }
 
+  /// Flux d'une offre précise (pour refléter en direct un re-match).
+  Stream<Offer?> watchOffer(String id) =>
+      _col.doc(id).snapshots().map((d) => d.exists ? Offer.fromDoc(d) : null);
+
   Future<void> markRead(String id, bool read) =>
       _col.doc(id).set({'is_read': read}, SetOptions(merge: true));
+
+  /// Ajoute/retire l'offre des favoris (étoile).
+  /// Renvoie null si OK, sinon un message d'erreur. On ATTRAPE l'erreur : une
+  /// écriture refusée (règles Firestore non déployées) ou hors-ligne ne doit
+  /// JAMAIS lever d'exception non gérée (sinon flood → gel du thread UI).
+  Future<String?> toggleFavorite(String id, bool favorite) async {
+    try {
+      await _col.doc(id).set({'is_favorite': favorite}, SetOptions(merge: true));
+      return null;
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        return 'Favoris non activés côté serveur (règles Firestore à déployer).';
+      }
+      return 'Impossible d\'enregistrer le favori (${e.code}).';
+    } catch (_) {
+      return 'Impossible d\'enregistrer le favori.';
+    }
+  }
 
   /// Marque toutes les offres non lues comme lues (action « tout marquer lu »).
   Future<void> markAllRead(List<Offer> offers) async {
