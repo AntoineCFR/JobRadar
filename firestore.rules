@@ -12,17 +12,23 @@ service cloud.firestore {
     }
 
     // Les offres sont écrites par le backend (Admin SDK, qui bypasse ces règles).
-    // Depuis l'app : lecture, et écriture limitée au champ `is_read`.
+    // Depuis l'app : lecture, et écriture limitée aux champs `is_read` / `is_favorite`.
     match /offers/{offerId} {
       allow read: if isAllowed();
       allow update: if isAllowed()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_read']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_read', 'is_favorite']);
       allow create, delete: if false; // réservé au backend
     }
 
     match /scrape_runs/{runId} {
       allow read: if isAllowed();
       allow write: if false; // réservé au backend
+    }
+
+    // Fiches entreprises (localisation) : lues par l'app, écrites par le backend.
+    match /companies/{companyId} {
+      allow read: if isAllowed();
+      allow write: if false; // réservé au backend (Admin SDK)
     }
 
     // Recherches surveillées par le cron : gérées depuis l'app (phase 2).
