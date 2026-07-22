@@ -6,6 +6,7 @@ import '../models/offer.dart';
 import '../services/company_service.dart';
 import '../services/offers_service.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/backend_activity_bar.dart';
 import 'company_detail_screen.dart';
 
 enum CompanySort { alpha, count }
@@ -101,11 +102,17 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
               ],
             ),
           ],
-          footer: Row(children: [
-            const Icon(Symbols.apartment, size: 16),
-            const SizedBox(width: 6),
-            Text('${companies.length} entreprise${companies.length > 1 ? 's' : ''}'),
-          ]),
+          footer: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(children: [
+                const Icon(Symbols.apartment, size: 16),
+                const SizedBox(width: 6),
+                Text('${companies.length} entreprise${companies.length > 1 ? 's' : ''}'),
+              ]),
+              const BackendActivityBar(fallbackLabel: 'Localisation des entreprises…'),
+            ],
+          ),
           body: Column(
             children: [
               Padding(
