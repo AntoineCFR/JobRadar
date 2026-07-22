@@ -417,6 +417,47 @@ def admin_analyze_profile_text():
         return jsonify(error=str(e)), 500
 
 
+@app.post("/admin/migrate-profile")
+def migrate_profile():
+    """Migre le profil vers un compte cible (par e-mail). Le profil SOURCE (le
+    plus riche) est copié sur `profiles/{uid_cible}` puis les autres profils sont
+    supprimés (app mono-utilisateur). Les favoris/offres sont globaux -> déjà
+    partagés, rien à faire pour eux.
+    """
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    email = str((request.get_json(silent=True) or {}).get("email") or "").strip()
+    if not email:
+        return jsonify(error="email requis"), 400
+    try:
+        from firebase_admin import auth
+        from store import firestore_store
+
+        try:
+            to_uid = auth.get_user_by_email(email).uid
+        except auth.UserNotFoundError:
+            return jsonify(error=f"aucun compte pour {email}"), 404
+
+        profiles = firestore_store.list_profiles()
+        candidates = [(u, d) for (u, d) in profiles if u != to_uid and d.get("structured")]
+        if not candidates:
+            return jsonify(error="aucun profil source à migrer"), 404
+        candidates.sort(key=lambda p: len(p[1].get("structured") or {}), reverse=True)
+        src_uid, data = candidates[0]
+
+        firestore_store.set_profile(to_uid, data)
+        removed = []
+        for u, _ in profiles:
+            if u != to_uid:
+                firestore_store.delete_profile(u)
+                removed.append(u)
+        return jsonify(status="ok", to_uid=to_uid, from_uid=src_uid, removed=removed,
+                       filename=data.get("filename"))
+    except Exception as e:  # noqa: BLE001
+        log.exception("migrate-profile failed")
+        return jsonify(error=str(e)), 500
+
+
 @app.post("/admin/setup-agents")
 def setup_agents():
     """Crée (ou retrouve) les agents Mistral dédiés et renvoie leurs IDs.

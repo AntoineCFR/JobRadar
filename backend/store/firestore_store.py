@@ -142,6 +142,17 @@ def set_profile(uid: str, data: dict) -> None:
     db.collection(config.FIRESTORE_PROFILES_COLLECTION).document(uid).set(data)
 
 
+def delete_profile(uid: str) -> None:
+    db = init()
+    db.collection(config.FIRESTORE_PROFILES_COLLECTION).document(uid).delete()
+
+
+def list_profiles() -> list[tuple[str, dict]]:
+    db = init()
+    return [(d.id, d.to_dict() or {})
+            for d in db.collection(config.FIRESTORE_PROFILES_COLLECTION).stream()]
+
+
 def first_profile() -> tuple[str, dict] | None:
     """App mono-utilisateur : renvoie (uid, profil) du 1er profil trouvé, ou None."""
     db = init()
