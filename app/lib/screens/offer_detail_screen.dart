@@ -13,6 +13,7 @@ import '../services/scrape_service.dart';
 import 'company_detail_screen.dart' show openMaps;
 import '../widgets/app_scaffold.dart';
 import '../widgets/explained_list.dart';
+import '../widgets/lang_flag_selector.dart';
 import '../widgets/match_card.dart';
 import '../widgets/skill_block.dart';
 import 'offer_description_screen.dart';
@@ -81,17 +82,11 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           icon: const Icon(Symbols.calculate),
           onPressed: _rematching ? null : _rematch,
         ),
-        if (o.hasTranslation)
-          PopupMenuButton<bool>(
-            tooltip: 'Langue',
-            icon: Text(_showEnglish ? '🇬🇧' : '🇨🇿', style: const TextStyle(fontSize: 20)),
-            initialValue: _showEnglish,
-            onSelected: (v) => setState(() => _showEnglish = v),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: false, child: Text('🇨🇿  Original (tchèque)')),
-              PopupMenuItem(value: true, child: Text('🇬🇧  Anglais (traduit)')),
-            ],
-          ),
+        LangFlagSelector(
+          offer: o,
+          english: _showEnglish,
+          onChanged: (v) => setState(() => _showEnglish = v),
+        ),
       ],
       floatingActionButton: o.applyUrl.isEmpty
           ? null
