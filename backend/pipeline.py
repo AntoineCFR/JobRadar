@@ -77,6 +77,20 @@ def run_scrape(
         if idx < len(new_cards):
             time.sleep(random.uniform(SCRAPE_MIN_DELAY, SCRAPE_MAX_DELAY))
 
+    # Expiration : offres de CETTE recherche non retrouvées -> expirées ; les
+    # offres expirées réapparues sont réactivées ; purge des expirées > 30 jours.
+    expiry = None
+    if persist:
+        from store import firestore_store
+
+        try:
+            expiry = firestore_store.reconcile_search_expiry(
+                f"{keyword}|{location}", {c.id for c in cards}
+            )
+            firestore_store.purge_expired(30)
+        except Exception as e:  # noqa: BLE001
+            log.warning("réconciliation expiration échouée: %s", e)
+
     summary = {
         "keyword": keyword,
         "location": location,
@@ -86,6 +100,7 @@ def run_scrape(
         "errors": errors,
         "duration_s": round(time.time() - started, 1),
         "new_offers": new_offers,
+        "expiry": expiry,
     }
 
     if persist:

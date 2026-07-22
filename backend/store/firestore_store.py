@@ -155,6 +155,79 @@ def stream_offers() -> list[tuple[str, dict]]:
     return [(d.id, d.to_dict() or {}) for d in db.collection(config.FIRESTORE_OFFERS_COLLECTION).stream()]
 
 
+# --------------------------------------------------------------------------- #
+# Entreprises (collection `companies`) — localisation déduite par agent.
+# --------------------------------------------------------------------------- #
+_COMPANIES = "companies"
+
+
+def set_company(key: str, data: dict) -> None:
+    db = init()
+    db.collection(_COMPANIES).document(key).set(data, merge=True)
+
+
+def get_company(key: str) -> dict | None:
+    db = init()
+    snap = db.collection(_COMPANIES).document(key).get()
+    return snap.to_dict() if snap.exists else None
+
+
+def list_company_keys() -> set[str]:
+    db = init()
+    return {d.id for d in db.collection(_COMPANIES).list_documents()}
+
+
+def reconcile_search_expiry(search_key: str, current_ids: set[str]) -> dict:
+    """Après un scraping du mot-clé `search_key` ("keyword|location") :
+      - marque `status="expired"` (+ `expired_at`) les offres ACTIVES de cette
+        recherche ABSENTES des résultats courants ;
+      - RÉACTIVE (status="active") celles qui réapparaissent.
+    N'écrit que sur changement d'état. Détection SIMPLE : une offre retrouvée par
+    une AUTRE recherche sera réactivée par le scraping de celle-ci.
+    """
+    from firebase_admin import firestore
+
+    db = init()
+    col = db.collection(config.FIRESTORE_OFFERS_COLLECTION)
+    expired = reactivated = 0
+    for snap in col.where("searches", "array_contains", search_key).stream():
+        d = snap.to_dict() or {}
+        status = d.get("status", "active")
+        found = snap.id in current_ids
+        if found and status == "expired":
+            snap.reference.set(
+                {"status": "active", "expired_at": firestore.DELETE_FIELD}, merge=True
+            )
+            reactivated += 1
+        elif not found and status != "expired":
+            snap.reference.set(
+                {"status": "expired", "expired_at": firestore.SERVER_TIMESTAMP}, merge=True
+            )
+            expired += 1
+    if expired or reactivated:
+        log.info("expiry[%s]: %s expirées, %s réactivées", search_key, expired, reactivated)
+    return {"expired": expired, "reactivated": reactivated}
+
+
+def purge_expired(days: int = 30) -> int:
+    """Supprime définitivement les offres expirées depuis plus de `days` jours."""
+    import datetime as _dt
+
+    db = init()
+    col = db.collection(config.FIRESTORE_OFFERS_COLLECTION)
+    cutoff = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=days)
+    purged = 0
+    for snap in col.where("status", "==", "expired").stream():
+        exp = (snap.to_dict() or {}).get("expired_at")
+        # `expired_at` est un Timestamp Firestore (tz-aware) une fois relu.
+        if exp is not None and hasattr(exp, "timestamp") and exp < cutoff:
+            snap.reference.delete()
+            purged += 1
+    if purged:
+        log.info("purge_expired: %s offres supprimées (> %s j)", purged, days)
+    return purged
+
+
 def set_offer_match(offer_id: str, match: dict, profile_version: str) -> None:
     db = init()
     payload = dict(match)

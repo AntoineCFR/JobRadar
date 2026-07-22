@@ -243,6 +243,57 @@ def match_one():
         return jsonify(error=str(e)), 500
 
 
+@app.post("/companies/locate")
+def companies_locate():
+    """Localise (agent Mistral) les entreprises SANS fiche, en tâche de fond."""
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    only_missing = bool((request.get_json(silent=True) or {}).get("only_missing", True))
+    with _lock:
+        if _state["running"]:
+            return jsonify(status="already_running"), 409
+        _state["running"] = True
+
+    def _run():
+        try:
+            import companies
+
+            summary = companies.locate_all(only_missing=only_missing, progress=_progress_cb)
+            with _lock:
+                _state["last"] = summary
+        except Exception as e:  # noqa: BLE001
+            log.exception("companies locate failed")
+            with _lock:
+                _state["last"] = {"error": str(e)}
+        finally:
+            _clear_progress()
+            with _lock:
+                _state["running"] = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify(status="started"), 202
+
+
+@app.post("/companies/locate-one")
+def companies_locate_one():
+    """Localise UNE entreprise (par nom), de façon synchrone. Body {company}."""
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    name = str((request.get_json(silent=True) or {}).get("company") or "").strip()
+    if not name:
+        return jsonify(error="company requis"), 400
+    try:
+        import companies
+
+        doc = companies.locate_one(name)
+        if not doc:
+            return jsonify(error="localisation impossible"), 422
+        return jsonify(status="ok", company=doc), 200
+    except Exception as e:  # noqa: BLE001
+        log.exception("companies locate-one failed")
+        return jsonify(error=str(e)), 500
+
+
 @app.post("/admin/reprocess-all")
 def admin_reprocess_all():
     """Re-traite toutes les offres (nouvelles consignes d'agents) en tâche de fond."""

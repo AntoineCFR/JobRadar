@@ -177,7 +177,13 @@ MATCH_INSTRUCTIONS = (
     "background (the 'experience' and 'domains' fields), INCLUDING non-data roles. "
     "For a Project Manager offer, the candidate's years of project management count "
     "fully — do not reduce them to a 'junior data' label. Use role-specific experience, "
-    "not the overall 'seniority' tag (which reflects the candidate's career pivot).\n"
+    "not the overall 'seniority' tag (which reflects the candidate's career pivot). "
+    "IMPLICIT SENIORITY: if the offer TITLE contains a seniority marker (Senior, Sr., "
+    "Experienced, Lead, Principal, or a local-language equivalent such as Czech "
+    "'zkušený'), treat the role as implicitly requiring ~3+ years of relevant "
+    "professional experience IN THE FIELD, even when no explicit years are stated, and "
+    "reflect it in the score/synthese. Keep it IMPLICIT: do NOT invent a numeric "
+    "requirement, and do NOT create a standalone fabricated blocker just for this.\n"
     "2. Consider ONLY requirements EXPLICITLY written in the offer. NEVER invent "
     "requirements or tools. Do NOT add Airflow, Luigi, orchestration tools, etc. unless "
     "the offer names them. If a tool/skill is not in the offer, it is NOT a requirement.\n"
@@ -253,6 +259,10 @@ CALIBRATE_INSTRUCTIONS = (
     "- KEEP legitimate gaps as blockers: missing required years of experience, required "
     "skills clearly below the required level, or an explicitly required fluent/business "
     "language the candidate lacks.\n"
+    "- IMPLICIT SENIORITY: a title with Senior / Sr. / Experienced / Lead / Principal "
+    "(or a local-language equivalent) implies ~3+ years in the field even without "
+    "explicit years; keep the score honest for a career-changer who lacks it, WITHOUT "
+    "inventing an explicit numeric requirement or a standalone blocker for it.\n"
     "- Language penalty is GRADUATED by the GAP between the required level and the "
     "candidate's OWN declared level for that language (read CANDIDATE.languages; never "
     "assume or hardcode). Required 2+ CEFR steps above the declared level (or a required "
@@ -267,9 +277,23 @@ CALIBRATE_INSTRUCTIONS = (
     "synthese, blockers, matches, plan)."
 )
 
+COMPANY_LOCATION_INSTRUCTIONS = (
+    "You locate a company's likely OFFICE / workplace for a job offer, to enable map "
+    "navigation. Given the COMPANY name, the offer LOCATION hints (city/region) and the "
+    "offer TEXT, return ONLY a JSON object: {\"city\": string|null, \"region\": string|null, "
+    "\"country\": string|null (default \"Czechia\" when the offer is clearly in Czechia), "
+    "\"address\": string|null (a street address ONLY if explicitly present in the text or "
+    "very well known; otherwise null — NEVER invent one), \"maps_query\": string (the BEST "
+    "Google Maps search string to reach the workplace, e.g. \"Huawei Technologies, Praha\" "
+    "or a full address when reliably known), \"confidence\": \"haute\"|\"moyenne\"|\"basse\"}. "
+    "Prefer the specific office city stated in the offer. When unsure of the exact address, "
+    "use \"{company}, {city}\" as maps_query and set a lower confidence."
+)
+
 _SPECS = {
     # extraction
     "extract": {"name": "JobRadar · Extraction offre", "instructions": EXTRACT_INSTRUCTIONS},
+    "company_location": {"name": "JobRadar · Localisation entreprise", "instructions": COMPANY_LOCATION_INSTRUCTIONS},
     "data_expert": {"name": "JobRadar · Expert Data (technos)", "instructions": DATA_EXPERT_INSTRUCTIONS},
     "benefits": {"name": "JobRadar · Avantages", "instructions": BENEFITS_INSTRUCTIONS},
     "verify": {"name": "JobRadar · Vérificateur extraction", "instructions": VERIFY_INSTRUCTIONS},
