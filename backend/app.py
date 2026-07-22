@@ -118,10 +118,17 @@ def profile_analyze():
     if not uid or not file:
         return jsonify(error="uid et file requis"), 400
     try:
-        from matching import build_profile
+        from matching import build_profile, merge_structured
         from store import firestore_store
 
         doc = build_profile(file.read(), file.filename or "profil.pdf")
+        # Fusion intelligente : le document ne met à jour QUE les sections qu'il
+        # mentionne ; le reste du profil (édité à la main ou issu d'autres docs)
+        # est conservé.
+        existing = firestore_store.get_profile(uid) or {}
+        doc["structured"] = merge_structured(
+            existing.get("structured") or {}, doc.get("structured") or {}
+        )
         firestore_store.set_profile(uid, doc)
     except Exception as e:  # noqa: BLE001
         log.exception("profile analyze failed")
@@ -200,6 +207,40 @@ def match():
 
     threading.Thread(target=_run, daemon=True).start()
     return jsonify(status="started"), 202
+
+
+@app.post("/match-one")
+def match_one():
+    """(Re)matche UNE seule offre avec le profil courant, de façon SYNCHRONE.
+
+    Body {id}. Utilisé par l'app après une édition de compétences (bouton
+    « actualiser le matching de cette offre »). Renvoie le résultat ; l'app le
+    verra aussi arriver en direct via Firestore.
+    """
+    if not _authorized(request):
+        return jsonify(error="unauthorized"), 401
+    offer_id = str((request.get_json(silent=True) or {}).get("id") or "")
+    if not offer_id:
+        return jsonify(error="id requis"), 400
+    try:
+        from store import firestore_store
+        from matching import match_offer
+
+        prof = firestore_store.first_profile()
+        if not prof:
+            return jsonify(error="aucun profil"), 400
+        _, profile = prof
+        offer = firestore_store.get_offer(offer_id)
+        if not offer:
+            return jsonify(error="offre introuvable"), 404
+        offer["id"] = offer_id
+        result = match_offer(profile.get("structured") or {}, offer)
+        if result:
+            firestore_store.set_offer_match(offer_id, result, profile.get("version", ""))
+        return jsonify(status="ok", match=result), 200
+    except Exception as e:  # noqa: BLE001
+        log.exception("match-one failed")
+        return jsonify(error=str(e)), 500
 
 
 @app.post("/admin/reprocess-all")
