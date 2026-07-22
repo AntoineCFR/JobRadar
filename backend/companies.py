@@ -7,14 +7,24 @@ son nom, de la ville de l'offre et du texte de l'offre. Sert au bouton
 from __future__ import annotations
 
 import re
+import time
 import logging
 import datetime as dt
 from typing import Callable, Optional
+
+import requests
 
 from extraction.agents import _ask_agent
 from store import firestore_store
 
 log = logging.getLogger("jobradar.companies")
+
+# Indices d'adresse dans le texte (cz/en) -> on priorise ces offres pour l'agent.
+_ADDR_HINT = re.compile(
+    r"\b(ulice|nám\.|náměstí|třída|sídlo|budova|adresa|address|street|psč|\d{3}\s?\d{2})\b",
+    re.I,
+)
+_NOMINATIM = "https://nominatim.openstreetmap.org/search"
 
 
 def company_key(name: str) -> str:
@@ -23,32 +33,96 @@ def company_key(name: str) -> str:
     return k or "unknown"
 
 
+def _geocode(query: str) -> Optional[dict]:
+    """Géocode une requête via Nominatim (OpenStreetMap). Gratuit, sans clé.
+    Renvoie {lat, lon, display_name, source} ou None."""
+    if not query:
+        return None
+    try:
+        r = requests.get(
+            _NOMINATIM,
+            params={"q": query, "format": "json", "limit": 1, "addressdetails": 1},
+            headers={"User-Agent": "JobRadar/1.0 (company workplace lookup)"},
+            timeout=20,
+        )
+        r.raise_for_status()
+        arr = r.json()
+        if arr:
+            it = arr[0]
+            return {
+                "lat": float(it["lat"]),
+                "lon": float(it["lon"]),
+                "display_name": it.get("display_name"),
+                "source": "osm",
+            }
+    except Exception as e:  # noqa: BLE001
+        log.warning("geocode échoué (%s): %s", query, e)
+    return None
+
+
 def locate_company(name: str, offers: list[dict]) -> Optional[dict]:
-    """Déduit et stocke la localisation d'une entreprise à partir de ses offres."""
-    city = ""
-    text = ""
+    """Déduit puis GÉOCODE la localisation d'une entreprise à partir de TOUTES
+    ses offres (villes, secteur, textes pour extraire une adresse), et stocke."""
+    cities: list[str] = []
+    regions: list[str] = []
+    sectors: list[str] = []
+    texts: list[str] = []
     for o in offers:
-        city = city or (o.get("location_city") or "")
-        if not text:
-            tr = o.get("translated") or {}
-            text = (tr.get("description_text") or o.get("description_text") or "")[:1500]
+        for k, bucket in (("location_city", cities), ("location_region", regions), ("sector", sectors)):
+            v = (o.get(k) or "").strip()
+            if v and v not in bucket:
+                bucket.append(v)
+        tr = o.get("translated") or {}
+        t = tr.get("description_text") or o.get("description_text") or ""
+        if t:
+            texts.append(t)
+    # Offres avec un indice d'adresse en premier ; on borne la taille.
+    texts.sort(key=lambda t: 0 if _ADDR_HINT.search(t) else 1)
+    joined = "\n---\n".join(texts)[:4000]
+    city = cities[0] if cities else ""
+
     out = _ask_agent(
         "company_location",
-        f"COMPANY: {name}\nOFFER LOCATION: {city}\nOFFER TEXT:\n{text}",
-        max_chars=3000,
-    )
-    if not out:
-        return None
-    maps_query = (out.get("maps_query") or "").strip() or f"{name}, {city}".strip(", ")
+        f"COMPANY: {name}\n"
+        f"SECTOR / DOMAIN: {', '.join(sectors) or 'unknown'}\n"
+        f"OFFER CITIES: {', '.join(cities) or 'unknown'}\n"
+        f"OFFER REGIONS: {', '.join(regions) or 'unknown'}\n"
+        f"OFFER TEXTS (may contain the workplace address):\n{joined}",
+        max_chars=6000,
+    ) or {}
+
+    country = out.get("country") or "Czechia"
+    address = out.get("address")
+    maps_query = (out.get("maps_query") or "").strip()
+
+    # Géocodage réel : adresse explicite > requête agent > nom + ville.
+    candidates: list[str] = []
+    if address:
+        candidates.append(", ".join(p for p in [address, city, country] if p))
+    if maps_query:
+        candidates.append(maps_query)
+    candidates.append(", ".join(p for p in [name, city, country] if p))
+    geo = None
+    seen: set[str] = set()
+    for q in candidates:
+        if not q or q in seen:
+            continue
+        seen.add(q)
+        geo = _geocode(q)
+        time.sleep(1.1)  # Nominatim : max 1 requête/seconde
+        if geo:
+            break
+
     doc = {
         "name": name,
         "location": {
-            "city": out.get("city"),
-            "region": out.get("region"),
-            "country": out.get("country") or "Czechia",
-            "address": out.get("address"),
-            "maps_query": maps_query,
+            "city": out.get("city") or (city or None),
+            "region": out.get("region") or (regions[0] if regions else None),
+            "country": country,
+            "address": address,
+            "maps_query": maps_query or ", ".join(p for p in [name, city] if p),
             "confidence": out.get("confidence") or "basse",
+            "geo": geo,  # {lat, lon, display_name, source} ou None
         },
         "updated_at": dt.datetime.utcnow().isoformat() + "Z",
     }

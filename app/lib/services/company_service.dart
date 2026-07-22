@@ -12,6 +12,10 @@ class CompanyLocation {
   final String? address;
   final String? mapsQuery;
   final String? confidence;
+  // Géocodage réel (OpenStreetMap) : adresse résolue + coordonnées.
+  final double? lat;
+  final double? lon;
+  final String? displayName;
 
   CompanyLocation({
     this.city,
@@ -20,10 +24,17 @@ class CompanyLocation {
     this.address,
     this.mapsQuery,
     this.confidence,
+    this.lat,
+    this.lon,
+    this.displayName,
   });
 
-  /// Libellé lisible (adresse si connue, sinon ville/région/pays).
+  bool get isGeocoded => lat != null && lon != null;
+
+  /// Libellé lisible : adresse OSM résolue si dispo, sinon adresse agent, sinon
+  /// ville/région/pays.
   String get label {
+    if (displayName != null && displayName!.isNotEmpty) return displayName!;
     final parts = <String>[
       if (address != null && address!.isNotEmpty) address!,
       if (city != null && city!.isNotEmpty) city!,
@@ -33,12 +44,23 @@ class CompanyLocation {
     return parts.join(' · ');
   }
 
-  String get query => (mapsQuery != null && mapsQuery!.isNotEmpty)
-      ? mapsQuery!
-      : [city, country].where((e) => e != null && e.isNotEmpty).join(', ');
+  /// Requête Maps : coordonnées précises si géocodé, sinon la requête textuelle.
+  String get query {
+    if (isGeocoded) return '$lat,$lon';
+    if (mapsQuery != null && mapsQuery!.isNotEmpty) return mapsQuery!;
+    return [city, country].where((e) => e != null && e.isNotEmpty).join(', ');
+  }
 
   static CompanyLocation? from(dynamic v) {
     if (v is! Map) return null;
+    final geo = v['geo'];
+    double? lat, lon;
+    String? displayName;
+    if (geo is Map) {
+      lat = (geo['lat'] as num?)?.toDouble();
+      lon = (geo['lon'] as num?)?.toDouble();
+      displayName = geo['display_name']?.toString();
+    }
     return CompanyLocation(
       city: v['city']?.toString(),
       region: v['region']?.toString(),
@@ -46,6 +68,9 @@ class CompanyLocation {
       address: v['address']?.toString(),
       mapsQuery: v['maps_query']?.toString(),
       confidence: v['confidence']?.toString(),
+      lat: lat,
+      lon: lon,
+      displayName: displayName,
     );
   }
 }

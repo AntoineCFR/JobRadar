@@ -278,16 +278,22 @@ CALIBRATE_INSTRUCTIONS = (
 )
 
 COMPANY_LOCATION_INSTRUCTIONS = (
-    "You locate a company's likely OFFICE / workplace for a job offer, to enable map "
-    "navigation. Given the COMPANY name, the offer LOCATION hints (city/region) and the "
-    "offer TEXT, return ONLY a JSON object: {\"city\": string|null, \"region\": string|null, "
-    "\"country\": string|null (default \"Czechia\" when the offer is clearly in Czechia), "
-    "\"address\": string|null (a street address ONLY if explicitly present in the text or "
-    "very well known; otherwise null — NEVER invent one), \"maps_query\": string (the BEST "
-    "Google Maps search string to reach the workplace, e.g. \"Huawei Technologies, Praha\" "
-    "or a full address when reliably known), \"confidence\": \"haute\"|\"moyenne\"|\"basse\"}. "
-    "Prefer the specific office city stated in the offer. When unsure of the exact address, "
-    "use \"{company}, {city}\" as maps_query and set a lower confidence."
+    "You determine a company's WORKPLACE location for a job offer, to enable map "
+    "navigation. You receive the COMPANY name, its SECTOR / DOMAIN, the offer CITIES and "
+    "REGIONS, and the offer TEXTS. Proceed in this ORDER:\n"
+    "1. If the offer TEXTS explicitly mention a workplace STREET ADDRESS (street name + "
+    "number, building, náměstí/ulice/třída, or a Czech postal code like '150 00'), extract "
+    "it VERBATIM into \"address\".\n"
+    "2. Otherwise, use your knowledge of the company AND its sector/domain to infer the most "
+    "likely office CITY (e.g. a large employer's known site, a bank's HQ city).\n"
+    "3. NEVER fabricate a precise street number that is not supported by the texts or clearly "
+    "known.\n"
+    "Return ONLY a JSON object: {\"city\": string|null, \"region\": string|null, \"country\": "
+    "string|null (default \"Czechia\" when clearly in Czechia), \"address\": string|null (the "
+    "explicit street address from rule 1, or a reliably-known HQ address, else null), "
+    "\"maps_query\": string (the BEST query to GEOCODE the workplace — a full address when "
+    "known, else \"{company}, {city}, {country}\"), \"confidence\": \"haute\"|\"moyenne\"|"
+    "\"basse\"}."
 )
 
 _SPECS = {
