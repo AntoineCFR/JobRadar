@@ -433,6 +433,7 @@ def migrate_profile():
         from firebase_admin import auth
         from store import firestore_store
 
+        firestore_store.init()  # garantit l'initialisation du SDK avant auth
         try:
             to_uid = auth.get_user_by_email(email).uid
         except auth.UserNotFoundError:
