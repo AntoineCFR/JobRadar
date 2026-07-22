@@ -126,14 +126,15 @@ def search(
     return results
 
 
-def fetch_detail(card: ListingCard, sess: Optional[requests.Session] = None) -> Optional[dict]:
-    """Récupère le détail structuré d'une offre.
+def _has_content(job_ad: Optional[dict]) -> bool:
+    """Vrai si le détail contient bien du contenu exploitable (htmlContent)."""
+    if not job_ad:
+        return False
+    return bool((job_ad.get("content") or {}).get("htmlContent"))
 
-    Deux voies :
-      - offre sur un micro-site employeur ({employeur}.jobs.cz) -> API GraphQL ;
-      - offre hébergée sur www.jobs.cz -> parsing HTML server-rendered.
-    """
-    sess = sess or _session()
+
+def _fetch_detail_once(card: ListingCard, sess: requests.Session) -> Optional[dict]:
+    """Une tentative de récupération du détail (GraphQL puis fallback HTML)."""
     host = resolve_employer_host(card.link, sess)
     if host and host != "www.jobs.cz":
         job_ad = fetch_job_ad(card.id, card.link, sess=sess)
@@ -142,3 +143,34 @@ def fetch_detail(card: ListingCard, sess: Optional[requests.Session] = None) -> 
         log.info("GraphQL failed for %s, trying HTML fallback", card.id)
     # www.jobs.cz ou échec GraphQL -> fallback HTML
     return fetch_detail_html(card, sess=sess)
+
+
+def fetch_detail(
+    card: ListingCard,
+    sess: Optional[requests.Session] = None,
+    retries: int = 2,
+    retry_delay: float = 2.0,
+) -> Optional[dict]:
+    """Récupère le détail structuré d'une offre, avec RETRY.
+
+    Deux voies :
+      - offre sur un micro-site employeur ({employeur}.jobs.cz) -> API GraphQL ;
+      - offre hébergée sur www.jobs.cz -> parsing HTML server-rendered.
+
+    Les échecs sont généralement TRANSITOIRES (rate-limiting jobs.cz, réseau) et
+    produisaient sinon des offres réduites à l'en-tête. On retente donc quelques
+    fois (backoff linéaire) tant que le contenu est vide.
+    """
+    sess = sess or _session()
+    job_ad = None
+    for attempt in range(retries + 1):
+        job_ad = _fetch_detail_once(card, sess)
+        if _has_content(job_ad):
+            return job_ad
+        if attempt < retries:
+            log.info("détail vide pour %s (tentative %s/%s), nouvel essai",
+                     card.id, attempt + 1, retries + 1)
+            time.sleep(retry_delay * (attempt + 1))
+    if not _has_content(job_ad):
+        log.warning("détail toujours vide pour %s après %s tentatives", card.id, retries + 1)
+    return job_ad
