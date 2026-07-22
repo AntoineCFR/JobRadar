@@ -53,23 +53,33 @@ def resolve_employer_host(rpd_url: str, sess: Optional[requests.Session] = None)
 def get_widget_credentials(
     host: str, sess: Optional[requests.Session] = None
 ) -> Optional[tuple[str, str]]:
-    """Retourne (widgetId, apiKey) pour un sous-domaine employeur, avec cache."""
+    """Retourne (widgetId, apiKey) pour un sous-domaine employeur, avec cache.
+
+    Le JS de config est en général à `/assets/js/script.min.js`, mais certains
+    micro-sites de marque (ex. `kdejinde.jobs.cz`, groupe ČEZ) le rangent dans un
+    sous-dossier `/assets/js/{marque}/script.min.js`. On essaie les deux.
+    """
     if host in _widget_cache:
         return _widget_cache[host]
     sess = sess or _session()
-    js_url = f"https://{host}/assets/js/script.min.js"
-    try:
-        js = sess.get(js_url, timeout=25).text
-    except requests.RequestException as e:
-        log.warning("could not fetch script.min.js for %s: %s", host, e)
-        return None
-    m = _WIDGET_RE.search(js) or _WIDGET_ANY_RE.search(js)
-    if not m:
-        log.info("no widget creds in script.min.js for %s (essai page inline)", host)
-        return None
-    creds = (m.group(1), m.group(2))
-    _widget_cache[host] = creds
-    return creds
+    brand = host.split(".")[0]
+    candidates = [
+        f"https://{host}/assets/js/script.min.js",
+        f"https://{host}/assets/js/{brand}/script.min.js",
+    ]
+    for js_url in candidates:
+        try:
+            js = sess.get(js_url, timeout=25).text
+        except requests.RequestException as e:
+            log.warning("could not fetch %s: %s", js_url, e)
+            continue
+        m = _WIDGET_RE.search(js) or _WIDGET_ANY_RE.search(js)
+        if m:
+            creds = (m.group(1), m.group(2))
+            _widget_cache[host] = creds
+            return creds
+    log.info("no widget creds for %s (tried %s ; essai page inline)", host, candidates)
+    return None
 
 
 # Widget v3 : config inline dans la page -> window.__LMC_CAREER_WIDGET__.push({...}).
