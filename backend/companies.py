@@ -14,6 +14,7 @@ from typing import Callable, Optional
 
 import requests
 
+import config
 from extraction.agents import _ask_agent
 from store import firestore_store
 
@@ -33,9 +34,41 @@ def company_key(name: str) -> str:
     return k or "unknown"
 
 
-def _geocode(query: str) -> Optional[dict]:
-    """Géocode une requête via Nominatim (OpenStreetMap). Gratuit, sans clé.
-    Renvoie {lat, lon, display_name, source} ou None."""
+def _geocode_google(query: str) -> Optional[dict]:
+    """Google Places Text Search : résout un NOM d'entreprise OU une adresse en
+    lieu réel (adresse formatée + coordonnées). Nécessite GOOGLE_MAPS_API_KEY."""
+    if not query:
+        return None
+    try:
+        r = requests.get(
+            "https://maps.googleapis.com/maps/api/place/textsearch/json",
+            params={"query": query, "region": "cz", "language": "cs",
+                    "key": config.GOOGLE_MAPS_API_KEY},
+            timeout=20,
+        )
+        r.raise_for_status()
+        data = r.json()
+        results = data.get("results") or []
+        status = data.get("status")
+        if status == "OK" and results:
+            it = results[0]
+            loc = (it.get("geometry") or {}).get("location") or {}
+            if loc.get("lat") is not None:
+                return {
+                    "lat": float(loc["lat"]),
+                    "lon": float(loc["lng"]),
+                    "display_name": it.get("formatted_address") or it.get("name"),
+                    "source": "google",
+                }
+        elif status not in ("OK", "ZERO_RESULTS"):
+            log.warning("google places status=%s: %s", status, data.get("error_message"))
+    except Exception as e:  # noqa: BLE001
+        log.warning("google geocode échoué (%s): %s", query, e)
+    return None
+
+
+def _geocode_osm(query: str) -> Optional[dict]:
+    """Géocode via Nominatim (OpenStreetMap). Gratuit, sans clé, taux plus faible."""
     if not query:
         return None
     try:
@@ -56,8 +89,16 @@ def _geocode(query: str) -> Optional[dict]:
                 "source": "osm",
             }
     except Exception as e:  # noqa: BLE001
-        log.warning("geocode échoué (%s): %s", query, e)
+        log.warning("geocode osm échoué (%s): %s", query, e)
     return None
+
+
+def _geocode(query: str) -> Optional[dict]:
+    """Google si une clé est configurée (meilleur pour les noms d'entreprise),
+    sinon OpenStreetMap/Nominatim."""
+    if config.GOOGLE_MAPS_API_KEY:
+        return _geocode_google(query)
+    return _geocode_osm(query)
 
 
 def locate_company(name: str, offers: list[dict]) -> Optional[dict]:
@@ -109,7 +150,8 @@ def locate_company(name: str, offers: list[dict]) -> Optional[dict]:
             continue
         seen.add(q)
         geo = _geocode(q)
-        time.sleep(1.1)  # Nominatim : max 1 requête/seconde
+        if not config.GOOGLE_MAPS_API_KEY:
+            time.sleep(1.1)  # Nominatim : max 1 requête/seconde (pas nécessaire avec Google)
         if geo:
             break
 

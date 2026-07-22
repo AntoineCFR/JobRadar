@@ -20,6 +20,11 @@ MISTRAL_MODEL = _get("MISTRAL_MODEL", "mistral-small-latest")
 MISTRAL_EXTRACT_AGENT_ID = _get("MISTRAL_EXTRACT_AGENT_ID")
 MISTRAL_TRANSLATE_AGENT_ID = _get("MISTRAL_TRANSLATE_AGENT_ID")
 
+# --- Google Maps Platform (localisation entreprises) ---
+# Clé API avec l'API "Places" activée (Text Search) + facturation. Si absente,
+# on retombe sur OpenStreetMap/Nominatim (gratuit mais taux de résolution faible).
+GOOGLE_MAPS_API_KEY = _get("GOOGLE_MAPS_API_KEY")
+
 # --- Firebase / Firestore (source de vérité lue par l'app) ---
 # Deux façons de fournir le service account :
 #  1) FIREBASE_CREDENTIALS_JSON = le JSON complet inline (variable d'env Render) ;
